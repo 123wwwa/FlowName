@@ -88,10 +88,16 @@ The graph traversal and scope fallback rules are unchanged. The planner and corr
 
 Request events include `prompt`, the exact naming prompt used by the built-in compatible provider. The web request card and CLI HTML report show it separately from internal analysis/budget metadata. Custom providers may implement their own prompt construction; the event is not proof of what such a provider transmits. Both recovery passes and repair requests retain the selected format.
 
-## Token estimates and live usage
+## Actual token usage
 
-After local planning and before the first provider request, the CLI, web playground and HTML report show planned requests, targets and estimated input tokens. Each request also shows its estimate, followed by provider-reported input/output tokens when its response arrives. Running totals include corrective attempts; missing usage stays unknown, with known subtotals shown separately.
-
-The local estimate sums rounded-up UTF-8 prompt bytes divided by four. It is a rough, model-independent heuristic, not a tokenizer count or a billing quote; source language and model tokenization can produce substantial differences. No extra API is called. API framing, custom-provider formatting and future repairs are excluded. The output token cap is a configured ceiling for planned requests, not predicted output usage or a total billing guarantee. For two passes, the initial estimate covers both preliminary plans; the second plan event replaces it with the revised pass-two estimate. Planning does not pause for confirmation. Exact provider token counting is not implemented.
+The CLI, web playground and HTML report display provider-reported input/output tokens per response and running totals, including corrective attempts. Missing usage remains unknown, with known subtotals shown separately. No pre-request token or monetary cost estimate is provided. Internal output limits remain in force for provider requests; they are not predictions of usage.
 
 The HTML reporter retries file replacement up to four attempts for EPERM, EACCES and EBUSY. If the file remains locked, it records a report-warning in events.jsonl and warns on stderr without failing inference. The page may remain stale until a later successful refresh; final output.js and result.json are saved independently. Journal or result-write failures and unrelated filesystem errors still propagate. The reporter's warnings array exposes refresh warnings to library callers.
+
+## Source context selection
+
+Use `contextMode: "usage"` (default), CLI `--context-mode usage`, or the web Source context selector to add bounded use excerpts after the normal declaration-based grouping plan. Choose `declarations` for the prior baseline. Both modes retain exactly the same initial groups and relation facts for the same input and settings.
+
+The additive allowance is at most 2,048 UTF-8 prompt bytes per request and never exceeds promptBytes. It can increase billed tokens even though the initial request count stays fixed. At most two uses per target are considered in round-robin order; entries that do not fit are skipped. Short switch expressions and case values identify the enclosing syntax without transmitting the case body; fallthrough remains possible. Overlapping use ranges and shared labels are deduplicated within a request. Metadata records included/omitted selections and added bytes, not token estimates. Corrective retries still obey the total byte limit and may be skipped if the correction suffix cannot fit.
+
+No API evaluation has yet established a naming-quality benefit for this mode.

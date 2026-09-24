@@ -76,3 +76,5 @@
 **/AGENTS.md
 **/agents.md
 **/agent.md
+
+!/src/usage-context.ts

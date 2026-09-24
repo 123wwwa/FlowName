@@ -69,7 +69,7 @@ s9, s47, s27, s14, s11
 
 `a` connects to `e`; `e` exposes `d` and `c`; `d` exposes `b`. All five fit into one request. Relation neighbors may cross lexical scopes, as `a` does here. Same-scope restriction applies to the fallback selection, not every relation edge.
 
-The planner takes declaration-centered excerpts, merges overlapping ranges, and retains only facts whose two endpoints are in the group. This input is only 87 source units long, so the merged context happens to include the entire snippet. That does not mean the planner sends entire files or functions on larger inputs.
+The planner first takes declaration-centered excerpts, merges overlapping ranges, and retains only facts whose two endpoints are in the group. The default usage mode then adds selected use sites within spare budget; the declarations-only baseline skips this step. This input is only 87 source units long, so the merged context happens to include the entire snippet. That does not mean the planner sends entire files or functions on larger inputs.
 
 Observed request metadata:
 

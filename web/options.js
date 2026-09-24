@@ -20,6 +20,7 @@ export function validateInput(input = {}) {
 }
 
 export const optionSpecs = {
+  contextMode: {value:'usage', choices:['Bounded uses (default)', 'Declarations only (baseline)'], choiceValues:['usage','declarations'], label:'Source context', help:'Adds short use excerpts within remaining budget, without changing groups. No full switch cases or cross-request propagation.'},
   promptFormat: {value:'compact', choices:['Compact (default)', 'Verbose (previous format)'], choiceValues:['compact','verbose'], label:'Prompt format', help:'Compact keeps IDs, declaration offsets, source and relation facts while removing analysis metadata.'},
   passes: {value: 1, min: 1, max: 2, label: 'Recovery mode', choices: ['Single pass (default)', 'Two passes (experimental)'], help: 'Two passes propagate function/class names first and may increase requests, tokens and time.'},
   concurrency: {value: 16, min: 1, max: 32, label: 'Concurrent requests', help: 'Maximum in-flight API requests.'},

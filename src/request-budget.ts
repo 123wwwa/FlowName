@@ -1,7 +1,8 @@
-import type {Analysis,InferenceRequest,SymbolInfo,Relation,PromptFormat} from './types.js';
+import type {Analysis,InferenceRequest,SymbolInfo,Relation,PromptFormat,ContextMode} from './types.js';
 import {promptFor} from './grouping.js';
 /** UTF-8 byte budget is a conservative local proxy, NOT a measured token count. */
-export function budgetedRequests(code:string,analysis:Analysis,ids:string[],budget=12000,maxTargets=16,promptFormat:PromptFormat='compact'){
+export function budgetedRequests(code:string,analysis:Analysis,ids:string[],budget=12000,maxTargets=16,promptFormat:PromptFormat='compact',contextMode:ContextMode='usage'){
+ if(!['declarations','usage'].includes(contextMode))throw new Error('contextMode must be declarations or usage.');
  if(promptFormat!=='compact'&&promptFormat!=='verbose')throw new Error('promptFormat must be compact or verbose.');
  if(!Number.isSafeInteger(budget)||budget<1024||!Number.isSafeInteger(maxTargets)||maxTargets<1||maxTargets>64)throw new Error('Invalid request budget.');
  if(new Set(ids).size!==ids.length)throw new Error('Duplicate targets.');
@@ -41,6 +42,35 @@ export function budgetedRequests(code:string,analysis:Analysis,ids:string[],budg
    for(const n of neighbors.get(id)!)if(remaining.has(n))candidates.add(n);
   }
   output.push(Object.assign(request,{grouping:{kind:group.length===1?'singleton' as const:fallback?'scope-fallback' as const:'relation' as const,singletonOrigins:{}}}));
+ }
+ // Enrich only after grouping: identical groups and relation facts in both modes.
+ for(const request of output){
+  Object.assign(request.budgeting,{contextMode,usageSitesIncluded:0,usageSitesOmitted:0,addedPromptBytes:0});
+  if(contextMode==='declarations')continue;
+  const initial=request.budgeting.promptBytes,base=request.context;
+  const declarations=request.targets.map(s=>({start:Math.max(0,s.declaration.start-50),end:Math.min(code.length,Math.max(s.declaration.end,s.declaration.start+110))}));
+  const covered=(span:{start:number;end:number})=>declarations.some(r=>r.start<=span.start&&r.end>=span.end);
+  let accepted:Array<NonNullable<Analysis['usageContexts']>[string][number]>=[],included=0,omitted=0;
+  const appendix=(uses:typeof accepted)=>{
+   const guards=new Map<string,{kind:string;span:{start:number;end:number}}>();
+   for(const use of uses)for(const p of use.guards)guards.set(`${p.kind}:${p.span.start}:${p.span.end}`,p);
+   const ranges=uses.map(u=>({...u.span})).sort((a,b)=>a.start-b.start);
+   const merged:typeof ranges=[];for(const r of ranges){const last=merged.at(-1);if(last&&r.start<=last.end)last.end=Math.max(last.end,r.end);else merged.push(r);}
+   const fragments=[...guards.values(),...merged.map(span=>({kind:'use excerpt',span}))].filter(p=>!covered(p.span));
+   const links=[...new Set(uses.filter(u=>u.guards.length).map(u=>`/* use [${u.span.start},${u.span.end}) under ${u.guards.map(g=>`${g.kind} [${g.span.start},${g.span.end})`).join('; ')} */`))];
+   return '\n'+links.join('\n')+fragments.map(p=>`\n/* ${p.kind} [${p.span.start},${p.span.end}); separate source fragment */\n${code.slice(p.span.start,p.span.end)}\n`).join('');
+  };
+  for(let round=0;round<2;round++)for(const target of request.targets){
+   const use=analysis.usageContexts?.[target.id]?.[round];if(!use)continue;
+   if(covered(use.span)&&use.guards.every(g=>covered(g.span)))continue;
+   const prior=request.context;request.context=base+appendix([...accepted,use]);
+   const bytes=Buffer.byteLength(promptFor(request));
+   if(bytes>budget||bytes-initial>2048){request.context=prior;omitted++;continue;}
+   accepted.push(use);included++;request.budgeting.promptBytes=bytes;
+  }
+  const visible=[...declarations,...accepted.flatMap(u=>[u.span,...u.guards.map(g=>g.span)])];
+  const unexpanded=request.targets.reduce((n,t)=>n+symbols.get(t.id)!.references.filter(ref=>!visible.some(r=>r.start<=ref.start&&r.end>=ref.end)).length,0);
+  Object.assign(request.budgeting,{contextPolicy:'declaration excerpts plus bounded uses',referenceLocationsNotExpanded:unexpanded,usageSitesIncluded:included,usageSitesOmitted:omitted,addedPromptBytes:request.budgeting.promptBytes-initial});
  }
  return output;
 }

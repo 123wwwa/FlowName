@@ -19,5 +19,5 @@ export function rebaseAnalysis(code:string,previous:Analysis,applied:Record<stri
     if(symbol.name!==(applied[before.id]??before.name)||symbol.kind!==before.kind||symbol.namingRole!==before.namingRole)throw new Error('Pass boundary binding identity check failed.');
     ids.set(symbol.id,before.id);
   });
-  return {...next,symbols:next.symbols.map(s=>({...s,id:ids.get(s.id)!})),relations:next.relations.map(r=>({...r,from:ids.get(r.from)!,to:ids.get(r.to)!}))};
+  return {...next,usageContexts:Object.fromEntries(Object.entries(next.usageContexts??{}).map(([id,contexts])=>[ids.get(id)!,contexts])),symbols:next.symbols.map(s=>({...s,id:ids.get(s.id)!})),relations:next.relations.map(r=>({...r,from:ids.get(r.from)!,to:ids.get(r.to)!}))};
 }

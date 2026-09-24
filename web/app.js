@@ -5,7 +5,6 @@ const providers={gemini:'gemini-3.5-flash-lite',openai:'gpt-5-mini',groq:'openai
 $('provider').onchange=()=>{$('model').value=providers[$('provider').value];$('models').replaceChildren(Object.assign(document.createElement('option'),{value:$('model').value}));};
 $('example').onclick=()=>{$('source').value='function a(b,c){const d=b.filter(e=>e.active);return d.slice(0,c);}\nconsole.log(a([{active:true},{active:false}],1));';};
 const text=(tag,value)=>Object.assign(document.createElement(tag),{textContent:String(value??'—')});
-const estimateSummary=text('p','Token estimate appears after local analysis, before API requests.');$('form').append(estimateSummary);
 let inputTokens=0,outputTokens=0,unknownUsage=0;
 for (const [key, spec] of Object.entries(optionSpecs)) {
  const label=text('label',spec.label);
@@ -14,12 +13,10 @@ for (const [key, spec] of Object.entries(optionSpecs)) {
  label.append(input,text('span',spec.help));$('recovery-options').append(label);
 }
 function show(event){
- if(event.type==='plan'&&event.estimate){const e=event.estimate;estimateSummary.textContent=`Plan (pass ${event.pass}): ${e.requests} requests / ${e.targets} targets · Estimated input tokens: ~${e.inputTokens} · Output token cap: ${e.outputTokenLimit}. ${e.method}`;}
  if(event.total!==undefined)total=event.total;
  if(event.type==='plan'){total=event.total;$('status').textContent=`Recovering · Pass ${event.pass??1}`;}
  if(event.type==='request'){
   if(calls.size===0)$('calls').replaceChildren();const card=document.createElement('details');card.append(text('summary',`Request ${event.index+1} · Pass ${event.pass??1} · Group ${(event.groupIndex??event.index)+1} · Attempt ${event.attempt??1} · ${event.request.targets.length} identifiers · In flight`));
-  card.append(text('p',`Estimated input tokens: ~${event.estimate?.inputTokens??'Unknown'} · Output token cap: ${event.estimate?.outputTokenLimit??'Unknown'} (not predicted usage)`));
   const table=document.createElement('table');const head=document.createElement('tr');for(const label of ['Input name / ID','Suggested name','Final name','Adjustment reason'])head.append(text('th',label));table.append(head);
   const rows=new Map();for(const s of event.request.targets){const row=document.createElement('tr');for(const value of [`${s.name} / ${s.id}`,'Waiting','Pending final checks','—'])row.append(text('td',value));rows.set(s.id,row);table.append(row);}card.append(table);
   const prompt=document.createElement('details');prompt.append(text('summary','View exact naming prompt'),text('pre',event.prompt??'Prompt unavailable'));card.append(prompt);
@@ -52,7 +49,7 @@ $('form').onsubmit=async e=>{
   payload.options=validateOptions(Object.fromEntries(Object.keys(optionSpecs).map(key=>[key,optionSpecs[key].choiceValues?$(key).value:Number($(key).value)])));
  }catch(error){payload.apiKey='';$('error').textContent=error.message;$('status').textContent='Check input';if(error.field)$(error.field).focus();return;}
  controller=new AbortController();calls.clear();done=0;total=0;finalCode='';$('calls').replaceChildren();$('error').textContent='';$('status').textContent='Analyzing';$('output-section').hidden=true;$('renamed').textContent='—';$('tokens').textContent='—';$('progress').textContent='0 / 0';$('run').disabled=true;$('stop').disabled=false;
- inputTokens=0;outputTokens=0;unknownUsage=0;estimateSummary.textContent='Estimating tokens from the local request plan…';
+ inputTokens=0;outputTokens=0;unknownUsage=0;
  $('key').value='';
  try{
   $('recovery-options').disabled=true;

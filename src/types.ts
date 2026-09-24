@@ -1,4 +1,6 @@
 export interface Span { start: number; end: number }
+export interface UsageContext {span:Span;guards:Array<{kind:string;span:Span}>}
+export type ContextMode = 'declarations' | 'usage';
 export interface SymbolInfo {
   id: string;
   name: string;
@@ -14,6 +16,7 @@ export interface Definition { id: string; symbol: string; span: Span; kind: stri
 export interface Use { id: string; symbol: string; span: Span; definitions: string[] }
 export interface Relation { from: string; to: string; kind: 'assignment' | 'co-use' | 'property' | 'argument' | 'return'; span: Span; property?: string }
 export interface Analysis {
+ usageContexts?:Record<string,UsageContext[]>;
   version: 1;
   sourceHash: string;
   symbols: SymbolInfo[];

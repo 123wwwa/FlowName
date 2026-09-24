@@ -268,16 +268,16 @@ test('invalid prompt format fails before any model access',async()=>{
  await assert.rejects(recoverNames('let a=1;',{provider,promptFormat:'short'}),/promptFormat/);assert.equal(calls,0);
 });
 
-test('token estimates precede inference and repair usage remains actual',async()=>{
+test('actual repair usage is recorded without token estimates',async()=>{
  const events=[];let count=0;
  const result=await recoverNames('const a=1; const b=a+1; console.log(b);',{rpm:60000,provider:{label:'fixture',async infer(r){
-  count++;const event=events.at(-1);assert.equal(event.type,'request');assert.equal(event.estimate.inputTokens,Math.ceil(Buffer.byteLength(event.prompt)/4));
-  assert.equal(event.estimate.outputTokenLimit,128+64*r.targets.length);assert.ok(events[0].estimate.inputTokens>0);
+  count++;const event=events.at(-1);assert.equal(event.type,'request');assert.equal(event.estimate,undefined);
+  assert.equal(events[0].estimate,undefined);
   return {names:Object.fromEntries((count===1?r.targets.slice(0,1):r.targets).map(t=>[t.id,t.name])),inputTokens:10,outputTokens:3};
  }},onEvent:e=>events.push(e)});
  assert.equal(count,2);assert.equal(result.inputTokens,20);assert.equal(result.outputTokens,6);
  assert.equal(events.filter(e=>e.type==='request')[1].attempt,2);
- assert.match(events[0].estimate.method,/excludes API framing/);
+ assert.ok(events.every(e=>!('estimate' in e)));
 });
 
 test('HTML file locks are bounded and cannot discard provider results',async t=>{
@@ -291,7 +291,7 @@ test('HTML file locks are bounded and cannot discard provider results',async t=>
  assert.equal(calls,1);assert.equal(result.status,'completed');assert.equal(reporter.warnings.length,1);
  assert.match(await readFile(join(directory,'events.jsonl'),'utf8'),/report-warning/);
  assert.equal(JSON.parse(await readFile(join(directory,'result.json'),'utf8')).status,'completed');
- const html=await readFile(reporter.path,'utf8');assert.match(html,/Estimated input tokens/);assert.match(html,/1 responses unknown/);assert.match(html,/Actual input \/ output: Unknown \/ Unknown/);
+ const html=await readFile(reporter.path,'utf8');assert.doesNotMatch(html,/Estimated input tokens|Output token cap/);assert.match(html,/1 responses unknown/);assert.match(html,/Actual input \/ output: Unknown \/ Unknown/);
 });
 
 test('HTML rename retries recover transient locks but surface unrelated errors',async t=>{
@@ -315,4 +315,33 @@ test('permanent HTML replacement lock still saves final output and full event jo
  assert.equal(journal.at(-1).type,'complete');assert.equal(journal.filter(e=>e.type==='report-warning').length,1);
  assert.equal(JSON.parse(await readFile(join(directory,'result.json'),'utf8')).inputTokens,4);
  assert.match(await readFile(join(directory,'output.js'),'utf8'),/value/);
+});
+
+test('bounded use context preserves groups, budgets and lexical key evidence',async()=>{
+ const {lightweight}=await import('../dist/lightweight.js');const {budgetedRequests}=await import('../dist/request-budget.js');
+ const source='let a=0,b=0;'+ '/* padding */'.repeat(50)+'function f(e){'+'/* inner gap */'.repeat(30)+'switch(e.keyCode){case 32: if(!a){emit(17);a=1;}break;case 81:if(!b){emit(18);b=1;}break;}}';
+ const analysis=lightweight(source),ids=analysis.symbols.filter(s=>s.eligible).map(s=>s.id);
+ for(const format of ['compact','verbose'])for(const budget of [1024,12000]){
+  const base=budgetedRequests(source,analysis,ids,budget,16,format,'declarations'),uses=budgetedRequests(source,analysis,ids,budget,16,format,'usage');
+  assert.deepEqual(uses.map(r=>r.targets.map(t=>t.id)),base.map(r=>r.targets.map(t=>t.id)));
+  uses.forEach((r,i)=>{assert.deepEqual(r.relations,base[i].relations);assert.ok(Buffer.byteLength(promptFor(r))<=budget);assert.ok(r.budgeting.addedPromptBytes<=2048);});
+  if(budget===12000){const r=uses.find(r=>r.targets.some(t=>t.name==='a'));assert.match(r.context,/switch discriminant/);assert.match(r.context,/case label/);assert.match(r.context,/\n32\n/);assert.match(r.context,/!a/);assert.match(r.context,/fallthrough possible/);assert.doesNotMatch(r.context.slice(base[uses.indexOf(r)].context.length),/emit\(17\)/);}
+ }
+});
+
+test('use extraction respects function boundaries and bounded reference scanning',async()=>{
+ const {lightweight}=await import('../dist/lightweight.js');
+ const source='let a=0;switch(x){case 32:function f(){return a;}break;}'+Array.from({length:100},()=>';console.log(a)').join('');
+ const analysis=lightweight(source),symbol=analysis.symbols.find(s=>s.name==='a');
+ assert.ok(analysis.usageContexts[symbol.id].length<=2);
+ assert.ok(analysis.usageContexts[symbol.id].every(u=>u.guards.length===0));
+});
+
+test('context mode validation precedes provider calls and pass-two uses follow rebased IDs',async()=>{
+ let count=0;const provider={label:'fixture',async infer(r){count++;return {names:Object.fromEntries(r.targets.map(t=>[t.id,'name_'+t.id])),inputTokens:1,outputTokens:1};}};
+ await assert.rejects(recoverNames('let a=1;',{provider,contextMode:'bad'}),/contextMode/);assert.equal(count,0);
+ const {lightweight}=await import('../dist/lightweight.js');const {rebaseAnalysis}=await import('../dist/passes.js');const {rename}=await import('../dist/rename.js');
+ const source='function f(a){return a+1;}console.log(f(2));',before=lightweight(source),fn=before.symbols.find(s=>s.name==='f');
+ const changed=rename(source,before,{[fn.id]:'calculateValue'}),after=rebaseAnalysis(changed.code,before,changed.accepted);
+ for(const symbol of after.symbols)for(const use of after.usageContexts[symbol.id])assert.ok(changed.code.slice(use.span.start,use.span.end).includes(symbol.name));
 });

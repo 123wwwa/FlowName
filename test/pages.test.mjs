@@ -84,7 +84,7 @@ test('Pages assets work below a repository URL and contain no server transport',
 });
 
 test('web options enforce integer bounds and default concurrency to 16', () => {
-  assert.deepEqual(validateOptions(), {promptFormat:'compact',passes:1,concurrency:16,rpm:60,maxCalls:1000,promptBytes:12000,maxTargets:16});
+  assert.deepEqual(validateOptions(), {contextMode:'usage',promptFormat:'compact',passes:1,concurrency:16,rpm:60,maxCalls:1000,promptBytes:12000,maxTargets:16});
   for (const options of [{passes:3},{passes:0},{passes:1.5},{passes:"2"},{concurrency:33},{rpm:0},{maxCalls:1.5},{promptBytes:1023},{maxTargets:65},{concurrency:'16'},null]) {
     assert.throws(()=>validateOptions(options));
   }
@@ -228,11 +228,16 @@ test('browser prompt format defaults to compact and supports verbose in both pas
  const invalid=await runWorker('let a=1;','success',{promptFormat:'bad'});assert.equal(invalid.calls,0);assert.match(invalid.events[0].error,/promptFormat/);
 });
 
-test('browser bundle emits a local estimate before fetch and accounts for repairs',async()=>{
+test('browser bundle reports actual repair usage without token estimates',async()=>{
  const {events,calls}=await runWorker('const a=1;const b=a+2;console.log(b);','partial',{rpm:6000});
  assert.equal(calls,2);
- assert.ok(events[0].estimate.inputTokens>0);
- assert.equal(events[0].estimate.targets,2);
- for(const e of events.filter(e=>e.type==='request'))assert.equal(e.estimate.inputTokens,Math.ceil(new TextEncoder().encode(e.prompt).length/4));
+ assert.ok(events.every(e=>!('estimate' in e)));
  assert.equal(events.at(-1).result.inputTokens,60);assert.equal(events.at(-1).result.outputTokens,20);
+});
+
+test('browser exposes bounded uses and declaration baseline without changing groups',async()=>{
+ assert.equal(validateOptions().contextMode,'usage');assert.throws(()=>validateOptions({contextMode:'bad'}),/contextMode/);
+ const source='let a=0;'+ '/* gap */'.repeat(40)+'function f(e){'+'/* inner gap */'.repeat(30)+'switch(e.keyCode){case 32:if(!a)a=1;break;}}';
+ const plans=[];for(const contextMode of ['declarations','usage']){const {events}=await runWorker(source,'success',{contextMode,rpm:6000});const requests=events.filter(e=>e.type==='request');plans.push(requests.map(e=>e.request.targets.map(t=>t.id)));if(contextMode==='usage')assert.ok(requests.some(e=>e.prompt.includes('switch discriminant')));}
+ assert.equal(JSON.stringify(plans[0]),JSON.stringify(plans[1]));
 });

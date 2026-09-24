@@ -4,6 +4,7 @@ import * as t from '@babel/types';
 import { parseCode, span } from './analysis.js';
 import { budgetedRequests } from './request-budget.js';
 import { traverse } from './babel.js';
+import {collectUsage} from './usage-context.js';
 import type { Analysis, Relation, SymbolInfo, InferenceRequest } from './types.js';
 
 /** Lexical evidence only: no CFG, reaching definitions, alias or call resolution. */
@@ -72,7 +73,8 @@ export function lightweight(code: string): Analysis {
     },
   });
   if(dynamic)for(const s of bindings.values())s.eligible=false;
-  return {version:1,sourceHash:createHash('sha256').update(code).digest('hex'),symbols:[...bindings.values()].sort((a,b)=>a.declaration.start-b.declaration.start),relations,definitions:[],uses:[],flowMode:'lexical-relations',warnings:dynamic?['Direct eval/with: renaming disabled.']:[]};
+  const usageContexts=Object.fromEntries([...bindings].map(([binding,symbol])=>{check();return [symbol.id,collectUsage(binding)];}));
+  return {usageContexts,version:1,sourceHash:createHash('sha256').update(code).digest('hex'),symbols:[...bindings.values()].sort((a,b)=>a.declaration.start-b.declaration.start),relations,definitions:[],uses:[],flowMode:'lexical-relations',warnings:dynamic?['Direct eval/with: renaming disabled.']:[]};
 }
 
 export type ResearchMethod = 'local-500' | 'file-batch' | 'relation-guided' | 'relation-guided-scope' | 'budgeted';
