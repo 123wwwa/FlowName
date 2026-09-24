@@ -5,19 +5,22 @@ import {acceptResponse,ModelFormatError} from './inference.js';
 import {promptFor} from './grouping.js';
 import {mapConcurrent,serialWriter} from './concurrency.js';
 import {priorityTargets,rebaseAnalysis} from './passes.js';
-import type {Provider,InferenceRequest,Analysis} from './types.js';
+import type {Provider,InferenceRequest,Analysis,PromptFormat} from './types.js';
 export interface RecoveryEvent {
  type:'plan'|'request'|'response'|'pass-complete'|'complete'; time:string;
+ prompt?:string;
  index?:number; groupIndex?:number; attempt?:number; pass?:number; retrySkipped?:string;
  total?:number; request?:InferenceRequest; names?:Record<string,string>; error?:string;
  unresolved?:Record<string,string>; ignoredIds?:string[]; applied?:Record<string,string>;
  inputTokens?:number|null; outputTokens?:number|null; result?:RecoveryResult;
 }
-export interface RecoveryOptions {provider:Provider;passes?:1|2;concurrency?:number;rpm?:number;maxCalls?:number;promptBytes?:number;maxTargets?:number;signal?:AbortSignal;onEvent?:(event:RecoveryEvent)=>void|Promise<void>;}
+export interface RecoveryOptions {provider:Provider;promptFormat?:PromptFormat;passes?:1|2;concurrency?:number;rpm?:number;maxCalls?:number;promptBytes?:number;maxTargets?:number;signal?:AbortSignal;onEvent?:(event:RecoveryEvent)=>void|Promise<void>;}
 export interface RecoveryResult {code:string;proposed:Record<string,string>;accepted:Record<string,string>;rejected:Record<string,string>;adjustments:Record<string,string>;status:'completed'|'partial'|'cancelled';calls:number;plannedCalls:number;failedCalls:number;inputTokens:number|null;outputTokens:number|null;warnings:string[];}
 /** Shared call/rate budgets across at most two passes and one repair per group. */
 export async function recoverNames(code:string,options:RecoveryOptions):Promise<RecoveryResult>{
  const {provider,signal}=options;
+ const promptFormat=options.promptFormat??'compact';
+ if(promptFormat!=='compact'&&promptFormat!=='verbose')throw new Error('promptFormat must be compact or verbose.');
  const passes=options.passes??1;
  if(passes!==1&&passes!==2)throw new Error('passes must be 1 or 2.');
  const concurrency=options.concurrency??4,rpm=options.rpm??60,maxCalls=options.maxCalls??10000,promptBytes=options.promptBytes??12000;
@@ -29,7 +32,7 @@ export async function recoverNames(code:string,options:RecoveryOptions):Promise<
  const priority=passes===2?priorityTargets(originalAnalysis):[],prioritySet=new Set(priority);
  const localIds=allIds.filter(id=>!prioritySet.has(id));
  const phases=passes===2&&priority.length&&localIds.length?[priority,localIds]:[allIds];
- const plan=(source:string,analysis:Analysis,ids:string[])=>budgetedRequests(source,analysis,ids,promptBytes,options.maxTargets);
+ const plan=(source:string,analysis:Analysis,ids:string[])=>budgetedRequests(source,analysis,ids,promptBytes,options.maxTargets,promptFormat);
  // Preflight both sets on the original source. Pass two is rebuilt after application.
  const initialPlans=phases.map(ids=>plan(code,originalAnalysis,ids));
  let plannedCalls=initialPlans.reduce((n,requests)=>n+requests.length,0);
@@ -75,7 +78,7 @@ export async function recoverNames(code:string,options:RecoveryOptions):Promise<
     if(count>=maxCalls){stop=true;return;}
     // Reserve an index/call slot before awaiting the observer to avoid concurrent races.
     const index=requestCounter++;count++;if(attempt===1)pendingInitial--;
-    await emit({type:'request',index,groupIndex,attempt,pass,total:plannedCalls+retries,request});
+    await emit({type:'request',index,groupIndex,attempt,pass,total:plannedCalls+retries,request,prompt:promptFor(request)});
     if(stop||signal?.aborted){count--;return;}
     let event:Omit<RecoveryEvent,'time'>,needsRepair=false;
     let missing=request.targets.map(t=>t.id);
@@ -135,4 +138,4 @@ export async function recoverNames(code:string,options:RecoveryOptions):Promise<
 }
 export {CompatibleProvider} from './inference.js';
 export {createProvider} from './provider-config.js';
-export type {Provider,InferenceRequest,InferenceResult} from './types.js';
+export type {Provider,InferenceRequest,InferenceResult,PromptFormat} from './types.js';

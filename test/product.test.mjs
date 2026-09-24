@@ -56,7 +56,7 @@ test('malformed model JSON is retried once with correction and both attempts log
 });
 
 test('missing IDs stop after two attempts; retry honors call budget, byte budget and cancellation',async()=>{
- const code='const a=1,b=a+1,c=b+1,d=c+1,e=d+1; console.log(e);';
+ const code='const a=1,b=a+1,c=b+1,d=c+1,e=d+1,f=e+1,g=f+1,h=g+1; console.log(h);';
  for(const mode of ['twice','calls','bytes','cancel']){
   let calls=0,firstBytes=0;const events=[],controller=new AbortController();
   const provider={label:'invalid fixture',async infer(r){calls++;firstBytes=Buffer.byteLength(promptFor(r));return {names:{},inputTokens:5,outputTokens:2};}};
@@ -173,7 +173,7 @@ test('CLI reports progress and makes live HTML opt-in without losing output', as
  const input=join(root,'input.js');await writeFile(input,'const a=1; console.log(a);');
  for(const report of [false,true]) {
   const directory=join(root,report?'with report':'plain');
-  const args=['dist/product-cli.js',input,'--out',directory,'--provider','mock','--rpm','6000',...(report?['--report']:[])];
+  const args=['dist/product-cli.js',input,'--out',directory,'--provider','mock','--rpm','6000',...(report?['--report','--prompt-format','verbose']:[])];
   const {stdout,stderr}=await promisify(execFile)(process.execPath,args);
   assert.match(stderr,/Progress: 1\/1 responses/);
   assert.match(stderr,/in flight.*response errors.*retries.*tokens in\/out/);
@@ -186,6 +186,7 @@ test('CLI reports progress and makes live HTML opt-in without losing output', as
    assert.ok(files.includes('events.jsonl'));
    const events=(await readFile(join(directory,'events.jsonl'),'utf8')).trim().split('\n').map(JSON.parse);
    assert.ok(events.some(e=>e.type==='request'));assert.ok(events.some(e=>e.type==='response'));
+   assert.ok(events.filter(e=>e.type==='request').every(e=>e.request.promptFormat==='verbose'&&e.prompt.includes('defUses')));
    assert.match(await readFile(join(directory,'index.html'),'utf8'),/completed/);
   } else {
    assert.deepEqual(files.sort(),['output.js','result.json']);assert.ok(!stdout.includes('Live report'));
@@ -211,4 +212,58 @@ test('exported declarations stay public while implementation locals are recovere
  const result=await recoverNames(source,{provider:{label:'exports',async infer(r){assert.ok(r.targets.every(t=>!['a','f'].includes(t.name)));return {names:Object.fromEntries(r.targets.map(t=>[t.id,'parameter'])),inputTokens:1,outputTokens:1};}},rpm:60000});
  const module=await import('data:text/javascript,'+encodeURIComponent(result.code));
  assert.equal(module.value,2);assert.equal(module.default(3),5);
+});
+
+test('compact prompt preserves IDs, disambiguating offsets, source and relation facts',async()=>{
+ const {lightweight}=await import('../dist/lightweight.js');const {budgetedRequests}=await import('../dist/request-budget.js');
+ const source='const a=response.user;const b=a.permissions;function f(a){return a.length;}';
+ const analysis=lightweight(source),ids=analysis.symbols.filter(s=>s.eligible).map(s=>s.id);
+ const request=budgetedRequests(source,analysis,ids,100000,64)[0];
+ const compact=promptFor(request),verbose=promptFor({...request,promptFormat:'verbose'});
+ const body=JSON.parse(compact.split('\n').find(l=>l.startsWith('{')));
+ assert.deepEqual(body.targets,request.targets.map(s=>({id:s.id,name:s.name,at:s.declaration.start})));
+ assert.equal(body.context,request.context);assert.equal(body.defUses,undefined);assert.equal(body.definitions,undefined);
+ assert.deepEqual(body.relations,request.relations.map(({from,to,kind,property})=>({from,to,kind,...(property!==undefined?{property}:{})})));
+ assert.ok(Buffer.byteLength(compact)<Buffer.byteLength(verbose));
+ const full=JSON.parse(verbose.split('\n').find(l=>l.startsWith('{')));
+ assert.deepEqual(full,{targets:request.targets,context:request.context,relations:request.relations,defUses:request.defUses,definitions:request.definitions});
+ assert.equal(request.targets.filter(s=>s.name==='a').length,2);
+ assert.equal(new Set(body.targets.filter(s=>s.name==='a').map(s=>s.at)).size,2);
+});
+
+test('selected prompt format controls grouping byte budgets, never target coverage',async()=>{
+ const {lightweight}=await import('../dist/lightweight.js');const {budgetedRequests}=await import('../dist/request-budget.js');
+ const source=Array.from({length:12},(_,i)=>`const variable${i}=${i};`).join('\n');
+ const a=lightweight(source),ids=a.symbols.map(s=>s.id);
+ const full=budgetedRequests(source,a,ids,100000,16,'compact')[0];const budget=Math.max(1024,Buffer.byteLength(promptFor(full)));
+ const compact=budgetedRequests(source,a,ids,budget,16,'compact'),verbose=budgetedRequests(source,a,ids,budget,16,'verbose');
+ assert.equal(compact.length,1);assert.ok(verbose.length>compact.length);
+ for(const requests of [compact,verbose]){
+  assert.deepEqual(requests.flatMap(r=>r.targets.map(t=>t.id)).sort(),[...ids].sort());
+  for(const r of requests){assert.equal(r.budgeting.promptBytes,Buffer.byteLength(promptFor(r)));assert.ok(r.budgeting.promptBytes<=budget);}
+ }
+});
+
+test('both formats log the exact provider prompt and preserve IDs through partial repair',async()=>{
+ const old=globalThis.fetch;
+ try{for(const promptFormat of ['compact','verbose']){
+  const events=[],bodies=[];
+  globalThis.fetch=async(_url,init)=>{
+   const b=JSON.parse(init.body);bodies.push(b);
+   const payload=JSON.parse(b.messages[0].content.split('\n').find(l=>l.startsWith('{')));
+   const targets=bodies.length===1?payload.targets.slice(0,1):payload.targets;
+   return new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({names:Object.fromEntries(targets.map(t=>[t.id,'recovered']))})}}],usage:{prompt_tokens:10,completion_tokens:3}}));
+  };
+  const result=await recoverNames('const a=1,b=a+1;globalThis.answer=b;',{provider:new CompatibleProvider({baseUrl:'https://fixture.invalid',apiKey:'fixture',model:'m'}),promptFormat,maxCalls:2,rpm:60000,onEvent:e=>events.push(e)});
+  assert.equal(result.status,'completed');assert.equal(bodies.length,2);
+  const requests=events.filter(e=>e.type==='request');
+  for(let i=0;i<2;i++){assert.equal(requests[i].request.promptFormat,promptFormat);assert.equal(requests[i].prompt,bodies[i].messages[0].content);assert.equal(Buffer.byteLength(requests[i].prompt),requests[i].request.budgeting.promptBytes);}
+  assert.equal(requests[1].request.targets[0].id,requests[0].request.targets[1].id);
+  assert.equal(requests[1].request.targets.length,1);assert.match(requests[1].prompt,/Correction:/);
+ }}finally{globalThis.fetch=old;}
+});
+
+test('invalid prompt format fails before any model access',async()=>{
+ let calls=0;const provider={label:'never',async infer(){calls++;throw Error('Unexpected call');}};
+ await assert.rejects(recoverNames('let a=1;',{provider,promptFormat:'short'}),/promptFormat/);assert.equal(calls,0);
 });

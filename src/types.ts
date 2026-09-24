@@ -24,7 +24,9 @@ export interface Analysis {
   flowMode: 'structured-cfg' | 'conservative' | 'lexical-relations';
 }
 export type Strategy = 'individual' | 'batch' | 'flow' | 'flow-relations';
+export type PromptFormat = 'compact' | 'verbose';
 export interface InferenceRequest {
+  promptFormat?: PromptFormat;
   formatRepair?: boolean;
   targets: SymbolInfo[];
   context: string;

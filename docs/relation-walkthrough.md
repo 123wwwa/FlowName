@@ -92,10 +92,12 @@ The five reference locations happen to be visible because the snippet is short; 
 
 | Field | Contents in this example |
 | --- | --- |
-| `targets` | Five binding records: ID, current name, kind, scope, declaration span, eligibility and an empty `references` array |
+| `targets` | Five compact records: ID, current name and `at` (declaration start offset) |
 | `context` | The merged source excerpt with its offset marker |
-| `relations` | The six facts above, including spans and property labels |
-| `defUses` / `definitions` | Empty arrays; no reaching-definition results are computed |
+| `relations` | The six facts above with `from`, `to`, `kind` and optional property labels; spans are omitted |
+| `defUses` / `definitions` | Omitted in compact mode; no reaching-definition results are computed |
+
+The default is `promptFormat: compact`. The `verbose` option keeps the previous full target records, relation spans and empty analysis arrays. Internal bindings and relation graphs retain their full metadata in both modes. `at` is an explicit position in the current pass source, not a position inferred from the ID; IDs remain stable when pass-two source positions change.
 
 Grouping and budgeting metadata are available to the host/logs but are not serialized by `promptFor`. [`requestBody`](../src/inference.ts) sends the rendered prompt as one user message through the compatible chat-completions API, with the selected model, temperature 0, JSON-object response format and the output allowance. Target IDs, rather than name spellings alone, identify which bindings the response addresses.
 

@@ -8,29 +8,33 @@ Identifiers are resolved to lexical bindings, keeping identical spellings in dif
 
 **Early evidence of lower request cost:** in a preliminary prototype experiment on the full Axios browser distribution (1,800 target bindings), relation-guided grouping with scope fallback used **25.96% fewer total tokens and 60.44% fewer API calls** than a one-identifier-per-request, 500-character-context baseline. This was one run per method on one input, not a direct benchmark against Humanify or JSIMPLIFIER or a demonstration of equivalent naming quality. See the [results, setup and evaluation limits](docs/experiments.md).
 
-**Alpha, not yet published to npm.** Local use requires Node.js 22.8+ (tested on Node 24).
+**Experimental alpha.** Requires Node.js 22.8+. APIs may change; review recovered code before using it.
 
 ## Web playground
 
 Open the link above, provide your JavaScript, enter your API key and choose a model. Adjust concurrency, RPM, call limits and grouping budgets, then start recovery. Follow requests and proposed names live; use **Stop** to interrupt a run. API requests go directly from your browser to the provider. For the same playground locally, run `npm ci` then `npm run playground` and open http://127.0.0.1:4173.
 
-Recovery defaults to one pass. Select **Two passes (experimental)** to propagate function/class names before inferring remaining names; this may increase cost.
+Prompt format defaults to **Compact**, preserving IDs, source and relation facts with less metadata. Select **Verbose** for the previous format. Recovery defaults to one pass. Select **Two passes (experimental)** to propagate function/class names before inferring remaining names; this may increase cost.
 
 ## CLI
 
-From a local checkout:
+Run the alpha CLI without a global installation:
 
 ```sh
-npm ci
-npm run build
-node dist/product-cli.js input.js --out ./new-report --report --provider gemini --model gemini-3.5-flash-lite --concurrency 4 --rpm 60 --max-calls 1000 --passes 1
+npx --package=flowname@alpha flowname input.js --out ./new-report --report --provider gemini --model gemini-3.5-flash-lite --concurrency 4 --rpm 60 --max-calls 1000 --passes 1 --prompt-format compact
 ```
 
 Set `GEMINI_API_KEY` (or `FLOWNAME_API_KEY`) in your environment. The CLI does not automatically load `.env`. Use a new output directory. Progress appears in the terminal; add `--report` to save a live HTML report and print its browser link (refreshes every two seconds). Without `--report`, only `output.js` and `result.json` are saved. Set `--passes 2` to opt into experimental two-pass recovery.
 
 ## Library
 
-Until an npm release is available, run `npm pack` in the checkout and install the generated tarball in your application with `npm install /path/to/flowname-0.1.0-alpha.1.tgz`.
+Install the alpha explicitly:
+
+```sh
+npm install flowname@alpha
+```
+
+For a local checkout, `npm pack` produces an installable tarball.
 
 ```js
 import { readFile } from 'node:fs/promises';
@@ -44,14 +48,14 @@ const provider = createProvider({
   apiKey: process.env.GEMINI_API_KEY,
 });
 const result = await recoverNames(sourceCode, {
-  provider, passes: 1, concurrency: 4, rpm: 60, maxCalls: 1000,
+  provider, passes: 1, promptFormat: 'compact', concurrency: 4, rpm: 60, maxCalls: 1000,
   promptBytes: 12000, maxTargets: 16,
   onEvent: reporter.onEvent,
 });
 console.log(result.status, result.code);
 ```
 
-The reporter requires a new directory with an existing parent. Open its `index.html` while running; it refreshes every two seconds. Reports contain source code, responses and recovered output. Set `passes: 2` to opt into experimental two-pass recovery. After tarball installation, the CLI is also available as `flowname input.js ...`.
+The reporter requires a new directory with an existing parent. Open its `index.html` while running; it refreshes every two seconds. Reports contain source code, responses and recovered output. Set `passes: 2` to opt into experimental two-pass recovery. After installation, the CLI is also available through `npx flowname input.js ...` in that project.
 
 See the **[documentation](docs/README.md)** for the approach, architecture, limitations, preliminary experiment results and detailed usage.
 

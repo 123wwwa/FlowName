@@ -1,7 +1,8 @@
-import type {Analysis,InferenceRequest,SymbolInfo,Relation} from './types.js';
+import type {Analysis,InferenceRequest,SymbolInfo,Relation,PromptFormat} from './types.js';
 import {promptFor} from './grouping.js';
 /** UTF-8 byte budget is a conservative local proxy, NOT a measured token count. */
-export function budgetedRequests(code:string,analysis:Analysis,ids:string[],budget=12000,maxTargets=16){
+export function budgetedRequests(code:string,analysis:Analysis,ids:string[],budget=12000,maxTargets=16,promptFormat:PromptFormat='compact'){
+ if(promptFormat!=='compact'&&promptFormat!=='verbose')throw new Error('promptFormat must be compact or verbose.');
  if(!Number.isSafeInteger(budget)||budget<1024||!Number.isSafeInteger(maxTargets)||maxTargets<1||maxTargets>64)throw new Error('Invalid request budget.');
  if(new Set(ids).size!==ids.length)throw new Error('Duplicate targets.');
  const symbols=new Map(analysis.symbols.map(s=>[s.id,s]));
@@ -17,7 +18,7 @@ export function budgetedRequests(code:string,analysis:Analysis,ids:string[],budg
   const merged:Array<[number,number]>=[];
   for(const r of ranges){const last=merged.at(-1);if(last&&r[0]<=last[1])last[1]=Math.max(last[1],r[1]);else merged.push([...r]);}
   const context=merged.map(([a,b])=>`\n/* excerpt [${a},${b}); may be partial */\n${code.slice(a,b)}\n`).join('');
-  const request:InferenceRequest={targets:targets.map(s=>({...s,references:[]})),context,relations:[],defUses:[],definitions:[]};
+  const request:InferenceRequest={promptFormat,targets:targets.map(s=>({...s,references:[]})),context,relations:[],defUses:[],definitions:[]};
   const facts=[...new Set(group.flatMap(id=>evidence.get(id)!))].filter(r=>set.has(r.from)&&set.has(r.to));
   let omitted=0;
   for(const r of facts){if(request.relations.length>=64){omitted++;continue;}request.relations.push(r);if(Buffer.byteLength(promptFor(request))>budget){request.relations.pop();omitted++;}}

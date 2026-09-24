@@ -86,7 +86,7 @@ Relations are lightweight syntactic evidence, not a complete def-use engine:
 
 There is no CFG, reaching-definition analysis, alias resolution or interprocedural call graph. The request's `definitions` and `defUses` fields are empty in this path.
 
-The planner greedily grows each group through relation neighbors, then remaining bindings in the seed's scope. A failed fit ends that group; it does not search all alternative subsets. Each eligible target appears in one planned request. A group may still contain a single target. A singleton that cannot fit causes planning to fail before networking.
+The planner greedily grows each group through relation neighbors, then remaining bindings in the seed's scope. A failed fit ends that group; it does not search all alternative subsets. The selected compact (default) or verbose serialization determines the measured prompt bytes; both use the same traversal rules. Each eligible target appears in one planned request. A group may still contain a single target. A singleton that cannot fit causes planning to fail before networking.
 
 Context consists of merged declaration excerpts: approximately 50 source units before each declaration and at least 110 from its start, extended to include its name. It does not expand every reference location or send whole functions by default. Up to 64 in-group relation facts are retained, subject to the prompt budget. The byte measurement covers `promptFor(request)` in UTF-8, not the HTTP envelope or tokenizer overhead. Metadata records omitted facts and unexpanded reference counts. The provider output allowance is `128 + 64 × target count` tokens.
 
@@ -173,7 +173,7 @@ Library and web defaults intentionally differ. Web validation runs at the browse
 | Web Stop / session timeout | Terminate worker and connections; received cards remain, but no final collision-checked output is guaranteed |
 | Observer failure | Reject the run and stop new scheduling; a complete result is not guaranteed |
 
-Analysis accepts up to 8 MiB of source and caps relation accumulation at 100,000. Its 30-second check is cooperative, not a hard parser timeout. Web input is limited to 512 KiB and a session to 20 minutes. Node web hosting allows two sessions per process with a 256 MiB worker old-generation limit; a browser worker has no equivalent configured memory quota. Web provider calls use a 30-second timeout and a 1 MiB response-body limit. Already-submitted requests may incur charges after cancellation.
+Analysis accepts up to 8 MiB of source and caps relation accumulation at 100,000. Its 30-second check is cooperative, not a hard parser timeout. Web input is limited to 8 MiB and a session to 20 minutes. Both hosted and local playgrounds analyze in a browser worker with no configured memory quota. Web provider calls use a 30-second timeout and a 1 MiB response-body limit. Already-submitted requests may incur charges after cancellation.
 
 ## Observability
 
