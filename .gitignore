@@ -6,6 +6,10 @@
 !/tsconfig.json
 !/README.md
 !/AGENTS.md
+!/docs/
+/docs/*
+!/docs/guide.md
+!/docs/jsimplifier-requests.md
 !/src/
 /src/*
 !/src/analysis.ts

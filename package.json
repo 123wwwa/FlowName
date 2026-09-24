@@ -48,6 +48,7 @@
   },
   "files": [
     "package-dist",
-    "README.md"
+    "README.md",
+    "docs"
   ]
 }

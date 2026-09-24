@@ -1,5 +1,7 @@
 # FlowName
 
+**[Try FlowName in your browser →](https://123wwwa.github.io/flowname/)** — bring your API key; no installation required.
+
 JavaScript identifier recovery with relation-aware request budgets and a live local HTML report.
 
 **Alpha, not yet published to npm.** Node.js 22.8+ (tested on Node 24). The API preserves lexical bindings with scope-aware collision suffixes; it does not guarantee semantic name quality or full behavioral equivalence. Direct eval/with disables renaming. It never executes your JavaScript.
@@ -10,7 +12,19 @@ FlowName started with a question: **can we reduce the token cost of LLM-assisted
 
 [Humanify](https://github.com/jehna/humanify#readme) documents one LLM call per identifier with a default surrounding context of 500 characters. This is a straightforward approach, but nearby identifiers can cause repeated source context and instructions to be sent across many requests. A fixed local window can also miss relevant uses elsewhere in the code. It does not explicitly group related identifiers for joint inference.
 
-[JSIMPLIFIER](https://www.ndss-symposium.org/wp-content/uploads/2026-f2198-paper.pdf) is another inspiration: its identifier-renaming stage builds on Humanify's AST-based approach, with adapted context management and multiple providers. Its wider pipeline includes static and dynamic analysis. The paper does not establish the same 500-character request policy, so we do not attribute Humanify's exact settings or an absence of program analysis to JSIMPLIFIER.
+### How JSIMPLIFIER sends naming requests
+
+We inspected the official [XingTuLab/JSIMPLIFIER implementation at commit `eaa72ae`](https://github.com/XingTuLab/JSIMPLIFIER/tree/eaa72ae63758957ac95b2f5e3391fefb96827987). Its OpenAI and Gemini naming paths work as follows:
+
+1. **One target name per invocation, sequentially.** `visitAllIdentifiers` collects Babel binding-identifier paths, sorts them by enclosing context size (largest first), and awaits the rename callback inside a loop. It applies each rename before preparing the next context. There is no multi-identifier response map or relation-guided target batching in these paths.
+2. **The default context setting is 1,000, not 500.** `scopeToString` stringifies a selected enclosing scope. If it is shorter than the setting, it sends it whole. For a longer non-program scope, it takes the first 1,000 JavaScript string units. For a longer program scope, it takes the first/last window near boundaries, otherwise slices from `identifier.start - 500` to `identifier.end + 500`. The central slice can therefore exceed 1,000 units by the identifier length; this is not a token budget.
+3. **OpenAI:** `chat.completions.create` receives a system instruction naming the single target and requesting a descriptive replacement, plus one user message containing the selected source excerpt. A strict JSON schema requires one string field, `newName`.
+4. **Gemini:** a system instruction names the single target; `generateContent(surroundingCode)` supplies the excerpt. JSON MIME type and an object response schema require `newName`.
+5. **AST application:** the returned name is normalized with Babel `toIdentifier`; collisions are handled with `_` prefixes before `scope.rename`. Later requests can see earlier renames. The visited set is keyed by name text, not a unique binding ID, so invocation counts should not be equated with all lexical bindings.
+
+These request builders send the target name and source text, without an explicit def-use graph or a related-target list. JSIMPLIFIER's broader deobfuscation pipeline still performs static and dynamic analysis. [Implementation details and pinned source links](docs/jsimplifier-requests.md) cover context selection, provider payloads and the separate local-model helper.
+
+### FlowName's approach
 
 FlowName addresses the repeated-request limitation through a lightweight semantic relation graph: lexical bindings, references, assignments, property accesses, arguments and return relations guide which identifiers share a request. Remaining singletons can be grouped within the same lexical scope. Request budgets bound group size and context, and AST renaming applies validated suggestions with collision handling. This is lightweight relation extraction, not complete JavaScript data-flow or alias analysis.
 
@@ -71,56 +85,7 @@ node dist/product-cli.js input.js --out ./new-report --provider gemini --model g
 
 Set `GEMINI_API_KEY` (or `FLOWNAME_API_KEY`) in your environment. The product does not automatically load `.env`. After installation from a tarball the same command is `flowname input.js ...`.
 
-## Contract and limits
+## Documentation
 
-- `recoverNames(source, options)` returns code, proposed/accepted/rejected/adjusted mappings, status, calls, nullable token usage and analysis warnings.
-- Custom providers implement `{ label, async infer(request) }`; see exported TypeScript types. Never embed a shared API key in browser bundles. The static playground accepts each visitor's own key for that session.
-- `onEvent` receives plan/request/response/complete events. Request contexts and parsed responses are observable. Observer failure rejects the run and stops new work; in-flight work drains.
-- AbortSignal/Ctrl+C stops scheduling and drains in-flight requests (provider timeout still applies). There are no automatic retries.
-- Authentication/quota failures or three consecutive errors stop new work. Partial runs return `status: 'partial'`; missing names stay unchanged. Plan exceeding maxCalls fails before network requests.
-- UTF-8 prompt byte budgets are a local proxy, not a tokenizer. Budgeted mode sends declaration excerpts and limited relation facts; omission counts are observable. Output has an explicit token cap. Long-source analysis has size/edge/cooperative-time limits, not a hard parser deadline.
-- `rpm` controls request starts, not tokens per minute or dollar spending. Unknown token usage remains null.
-
-## Development and packaging
-
-`npm test` runs offline regression tests. `npm pack` builds an installable alpha tarball with only the public entrypoints' dependency closure. It does not publish. Experiment scripts, old data/results and credentials are excluded from this product repository and package.
-
-Public npm name availability, license choice and npm publication remain release tasks. The playground supports GitHub Pages deployment; an official documentation site is a separate next step.
-
-
-## Web playground
-
-### GitHub Pages: browser-only hosting
-
-The static build runs analysis and renaming in a Web Worker. API requests go directly from the visitor's browser to the selected provider. GitHub Pages serves the application assets; no FlowName backend receives the key or source. Keys are cleared from the form when submitted, kept in memory for the run, and never written to localStorage, files or analytics. Each visitor supplies their own key and pays their provider's API charges. Do not put an owner API key in the workflow, repository or build environment.
-
-The UI streams per-request progress and suggestions. Stop terminates the worker, including its active connections, while retaining received suggestions on screen. Submitted API requests may still be billed. Source size is capped at 512 KB; each run defaults to 16 concurrent calls, 60 request starts per minute and 1,000 planned calls, with a fixed 20-minute time limit. The web form exposes `concurrency` (1–32), `rpm` (1–6,000), `maxCalls` (1–10,000), `promptBytes` (1,024–1,048,576; default 12,000) and `maxTargets` (1–64; default 16). Settings are validated before API access and locked during a run. RPM paces request starts independently of concurrency. Parsing and AST processing consume the visitor's memory and CPU; the worker keeps this work off the UI thread but has no fixed memory quota.
-
-Build and verify locally:
-
-```sh
-npm ci
-npm test
-npm run test:pages
-```
-
-Serve `pages-dist/` with any static HTTP server to preview it. Opening `index.html` as a `file://` URL is not supported because the app uses a module worker. Assets use relative paths, including the worker URL, so project URLs such as `https://<owner>.github.io/<repository>/` work without a custom domain.
-
-To enable automatic deployment:
-
-1. Push this product directory as the repository root, with `package.json` and `.github/` at the top level.
-2. In the repository, select **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-3. Push to `main`, or run **Test and deploy playground** from the Actions tab. If your default branch differs, update both `main` conditions in `.github/workflows/pages.yml`.
-4. Open the URL shown by the `github-pages` deployment after the workflow succeeds.
-
-The workflow runs offline library and browser-bundle tests, uploads only `pages-dist/`, then deploys it. Pull requests run the same checks without publishing. It neither calls a paid model nor publishes the npm package. See [GitHub's custom Pages workflow guide](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages) for repository configuration.
-
-Browser-direct requests depend on the provider's CORS policy, available model and key restrictions. A network/CORS failure is displayed in the request log; the page does not silently relay through another server. Live provider access is not verified by the offline deployment tests. Use the local server mode below if a provider does not allow browser requests.
-
-### Local Node server
-
-Run `npm ci` then `npm run playground` and open http://127.0.0.1:4173. Visitors to a hosted instance need only a browser, their provider API key and a model ID. The UI streams per-request contexts and suggestions, then displays final collision-checked names and a JavaScript download. Stop aborts the connection and terminates its worker; completed suggestions stay visible. Already submitted provider calls may still be billed.
-
-In this mode, keys and source pass through the Node host to an allowlisted provider endpoint; the application writes neither to disk or a database and never loads the host's API key. Use HTTPS when deploying publicly. Avoid request-body logging at your reverse proxy. `HOST` and `PORT` configure binding. Proxy buffering must be disabled for `/api/recover`. There are two concurrent sessions per process, 512 KB source and 20-minute per-session limits. Each session uses the same configurable options and defaults as the static playground. Model IDs are editable; suggested IDs are not an availability guarantee.
-
-The repository `.gitignore` is an allowlist of product sources, product tests, packaging files and the web app. Experiments, results, environment files, package artifacts, caches and generated builds stay local. Ignore rules do not remove files already tracked in an existing repository.
+- [Contract, limits, development and deployment](docs/guide.md)
+- [JSIMPLIFIER request implementation and source references](docs/jsimplifier-requests.md)
