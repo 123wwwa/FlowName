@@ -1,6 +1,6 @@
 # FlowName
 
-**[Try FlowName in your browser →](https://123wwwa.github.io/flowname/)** — bring your API key; no installation required.
+**[Try FlowName in your browser →](https://123wwwa.github.io/FlowName/)** — bring your API key; no installation required.
 
 FlowName is a lightweight **Semantic Identifier Recoverer** for JavaScript. It infers useful names for identifiers whose meaning has been lost, grouping related identifiers into LLM requests to reduce repeated context. The design prioritizes token cost and speed, with a live report showing each request, response and applied name.
 
