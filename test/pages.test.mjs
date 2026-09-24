@@ -5,13 +5,14 @@ import {runInNewContext} from 'node:vm';
 import {createHash as nodeHash} from 'node:crypto';
 import {createHash} from '../web/browser-crypto.js';
 import {runRecovery} from '../web/browser-transport.js';
+import {validateOptions} from '../web/options.js';
 
 test('browser hash adapter matches Node for Unicode source', () => {
   const source = 'const 이름 = "😀";';
   assert.equal(createHash('sha256').update(source).digest('hex'), nodeHash('sha256').update(source).digest('hex'));
 });
 
-async function runWorker(source, mode = 'success') {
+async function runWorker(source, mode = 'success', options) {
   const events = []; let pending, calls = 0, closed = false;
   const self = {
     postMessage(event) { events.push(event); if (event.type === 'request') pending = event.request; },
@@ -29,7 +30,7 @@ async function runWorker(source, mode = 'success') {
       return new Response(JSON.stringify({choices: [{message: {content: JSON.stringify({names})}}], usage: {prompt_tokens: 30, completion_tokens: 10}}));
     },
   });
-  await self.onmessage({data: {source, apiKey: 'fixture-secret', model: 'fixture', provider: 'gemini'}});
+  await self.onmessage({data: {source, apiKey: 'fixture-secret', model: 'fixture', provider: 'gemini', options}});
   assert.equal(closed, true);
   assert.ok(!JSON.stringify(events).includes('fixture-secret'));
   return {events, calls};
@@ -78,4 +79,29 @@ test('Pages assets work below a repository URL and contain no server transport',
   const app = await readFile('pages-dist/app.js', 'utf8');
   assert.ok(!app.includes('api/recover'));
   assert.ok(app.includes('browser-worker.js'));
+});
+
+test('web options enforce integer bounds and default concurrency to 16', () => {
+  assert.deepEqual(validateOptions(), {concurrency:16,rpm:60,maxCalls:1000,promptBytes:12000,maxTargets:16});
+  for (const options of [{concurrency:33},{rpm:0},{maxCalls:1.5},{promptBytes:1023},{maxTargets:65},{concurrency:'16'},null]) {
+    assert.throws(()=>validateOptions(options));
+  }
+});
+
+test('browser worker applies target, prompt and call limits before API access', async () => {
+  const source='const a=1; const b=a+1; console.log(a,b);';
+  const grouped=await runWorker(source);
+  assert.equal(grouped.calls,1);
+  const split=await runWorker(source,'success',{maxTargets:1,rpm:6000,promptBytes:4096});
+  assert.equal(split.calls,2);
+  for(const event of split.events.filter(e=>e.type==='request')) {
+    assert.equal(event.request.targets.length,1);
+    assert.equal(event.request.budgeting.limitBytes,4096);
+  }
+  const capped=await runWorker(source,'success',{maxTargets:1,maxCalls:1});
+  assert.equal(capped.calls,0);
+  assert.match(capped.events[0].error,/exceeding maxCalls/);
+  const invalid=await runWorker(source,'success',{concurrency:33});
+  assert.equal(invalid.calls,0);
+  assert.match(invalid.events[0].error,/concurrency/);
 });

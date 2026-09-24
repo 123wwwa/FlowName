@@ -1,4 +1,5 @@
 import {recoverNames, CompatibleProvider} from '../src/library.ts';
+import {validateOptions} from './options.js';
 
 const endpoints = {
   gemini: 'https://generativelanguage.googleapis.com/v1beta/openai',
@@ -19,7 +20,7 @@ self.onmessage = async ({data}) => {
     }
     await recoverNames(source, {
       provider: new CompatibleProvider({baseUrl: endpoints[provider], apiKey, model, timeoutMs: 30000, maxResponseBytes: 1048576}),
-      concurrency: 4, rpm: 60, maxCalls: 1000, onEvent: send,
+      ...validateOptions(data.options), onEvent: send,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Recovery failed';

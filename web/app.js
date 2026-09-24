@@ -1,9 +1,15 @@
 import {runRecovery} from './transport.js';
+import {optionSpecs, validateOptions} from './options.js';
 const $=id=>document.getElementById(id);let controller=null,finalCode='',total=0,done=0;const calls=new Map();
 const providers={gemini:'gemini-3.5-flash-lite',openai:'gpt-5-mini',groq:'openai/gpt-oss-20b'};
 $('provider').onchange=()=>{$('model').value=providers[$('provider').value];$('models').replaceChildren(Object.assign(document.createElement('option'),{value:$('model').value}));};
 $('example').onclick=()=>{$('source').value='function a(b,c){const d=b.filter(e=>e.active);return d.slice(0,c);}\nconsole.log(a([{active:true},{active:false}],1));';};
 const text=(tag,value)=>Object.assign(document.createElement(tag),{textContent:String(value??'—')});
+for (const [key, spec] of Object.entries(optionSpecs)) {
+ const label=text('label',spec.label);
+ const input=Object.assign(document.createElement('input'),{id:key,name:key,type:'number',min:String(spec.min),max:String(spec.max),step:'1',value:String(spec.value),required:true});
+ label.append(input,text('span',spec.help));$('recovery-options').append(label);
+}
 function show(event){
  if(event.type==='plan'){total=event.total;$('status').textContent='Recovering';}
  if(event.type==='request'){
@@ -30,8 +36,10 @@ $('form').onsubmit=async e=>{
  e.preventDefault();if(controller)return;controller=new AbortController();calls.clear();done=0;total=0;finalCode='';$('calls').replaceChildren();$('error').textContent='';$('status').textContent='Analyzing';$('output-section').hidden=true;$('renamed').textContent='—';$('tokens').textContent='—';$('progress').textContent='0 / 0';$('run').disabled=true;$('stop').disabled=false;
  const payload={source:$('source').value,provider:$('provider').value,model:$('model').value.trim(),apiKey:$('key').value.trim()};$('key').value='';
  try{
+  payload.options=validateOptions(Object.fromEntries(Object.keys(optionSpecs).map(key=>[key,Number($(key).value)])));
+  $('recovery-options').disabled=true;
   await runRecovery(payload,controller.signal,show);
  }catch(error){if(error.name!=='AbortError'){$('error').textContent=error.message;$('status').textContent='Run failed';}}
- finally{payload.apiKey='';controller=null;$('run').disabled=false;$('stop').disabled=true;}
+ finally{payload.apiKey='';controller=null;$('run').disabled=false;$('stop').disabled=true;$('recovery-options').disabled=false;}
 };
 $('download').onclick=()=>{const url=URL.createObjectURL(new Blob([finalCode],{type:'text/javascript'}));const a=document.createElement('a');a.href=url;a.download='recovered.js';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};

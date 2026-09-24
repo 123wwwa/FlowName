@@ -3,6 +3,7 @@ import {readFile} from 'node:fs/promises';
 import {Worker} from 'node:worker_threads';
 import {fileURLToPath} from 'node:url';
 import {resolve} from 'node:path';
+import {validateOptions} from './options.js';
 export function createPlayground({spawnWorker=(data)=>new Worker(new URL('./worker.mjs',import.meta.url),{workerData:data,resourceLimits:{maxOldGenerationSizeMb:256}})}={}){
  let active=0;
  return createServer(async(req,res)=>{
@@ -10,7 +11,7 @@ export function createPlayground({spawnWorker=(data)=>new Worker(new URL('./work
   for(const [k,v] of Object.entries(headers))res.setHeader(k,v);
   const fail=(status,message)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify({error:message}));};
   if(req.method==='GET'){
-   const files={'/':'index.html','/app.js':'app.js','/transport.js':'transport.js','/style.css':'style.css'};const file=files[req.url];if(!file)return fail(404,'Not found');
+   const files={'/':'index.html','/app.js':'app.js','/transport.js':'transport.js','/options.js':'options.js','/style.css':'style.css'};const file=files[req.url];if(!file)return fail(404,'Not found');
    try{const content=await readFile(new URL(file,import.meta.url));res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html; charset=utf-8');res.end(content);}catch{fail(500,'Asset unavailable');}return;
   }
   if(req.method!=='POST'||req.url!=='/api/recover')return fail(404,'Not found');
@@ -29,9 +30,10 @@ export function createPlayground({spawnWorker=(data)=>new Worker(new URL('./work
    let input;try{input=JSON.parse(Buffer.concat(chunks).toString());}catch{fail(400,'Invalid JSON');cleanup();return;}
    const {source,apiKey,model,provider}=input??{};
    if(typeof source!=='string'||!source.trim()||Buffer.byteLength(source)>524288||typeof apiKey!=='string'||!apiKey.trim()||apiKey.length>4096||typeof model!=='string'||!model.trim()||model.length>200||!['gemini','openai','groq'].includes(provider)){fail(400,'Source, API key, provider and model are required within limits.');cleanup();return;}
+   let options;try{options=validateOptions(input.options);}catch(error){fail(400,error.message);cleanup();return;}
    res.writeHead(200,{'Content-Type':'application/x-ndjson','X-Accel-Buffering':'no'});res.flushHeaders();
    clearTimeout(timer);timer=setTimeout(()=>{res.end(JSON.stringify({type:'fatal',error:'Session time limit reached (20 minutes). Completed suggestions remain visible.'})+'\n');cleanup();},1200000);
-   worker=spawnWorker({source,apiKey,model,provider});
+   worker=spawnWorker({source,apiKey,model,provider,options});
    worker.on('message',event=>{if(released)return;const line=JSON.stringify(event).split(apiKey).join('[REDACTED]')+'\n';if(!res.write(line)&&res.writableLength>4194304){res.end();cleanup();return;}if(['complete','fatal'].includes(event.type)){res.end();cleanup();}});
    worker.on('error',()=>{if(!released){res.end(JSON.stringify({type:'fatal',error:'Recovery worker failed.'})+'\n');cleanup();}});
    worker.on('exit',()=>{if(!released){res.end(JSON.stringify({type:'fatal',error:'Recovery worker exited before completion.'})+'\n');cleanup();}});
