@@ -267,3 +267,52 @@ test('invalid prompt format fails before any model access',async()=>{
  let calls=0;const provider={label:'never',async infer(){calls++;throw Error('Unexpected call');}};
  await assert.rejects(recoverNames('let a=1;',{provider,promptFormat:'short'}),/promptFormat/);assert.equal(calls,0);
 });
+
+test('token estimates precede inference and repair usage remains actual',async()=>{
+ const events=[];let count=0;
+ const result=await recoverNames('const a=1; const b=a+1; console.log(b);',{rpm:60000,provider:{label:'fixture',async infer(r){
+  count++;const event=events.at(-1);assert.equal(event.type,'request');assert.equal(event.estimate.inputTokens,Math.ceil(Buffer.byteLength(event.prompt)/4));
+  assert.equal(event.estimate.outputTokenLimit,128+64*r.targets.length);assert.ok(events[0].estimate.inputTokens>0);
+  return {names:Object.fromEntries((count===1?r.targets.slice(0,1):r.targets).map(t=>[t.id,t.name])),inputTokens:10,outputTokens:3};
+ }},onEvent:e=>events.push(e)});
+ assert.equal(count,2);assert.equal(result.inputTokens,20);assert.equal(result.outputTokens,6);
+ assert.equal(events.filter(e=>e.type==='request')[1].attempt,2);
+ assert.match(events[0].estimate.method,/excludes API framing/);
+});
+
+test('HTML file locks are bounded and cannot discard provider results',async t=>{
+ const fs=(await import('node:fs/promises')).default;
+ const directory=join(await mkdtemp(join(tmpdir(),'flowname-lock-')),'report');
+ const reporter=await createHtmlReporter(directory),original=fs.rename;
+ let attempts=0;
+ t.mock.method(fs,'rename',async(...args)=>{attempts++;if(attempts<=4)throw Object.assign(new Error('locked'),{code:'EPERM'});return original(...args);});
+ let calls=0;
+ const result=await recoverNames('const a=1; console.log(a);',{rpm:60000,provider:{label:'fixture',async infer(r){calls++;return {names:Object.fromEntries(r.targets.map(t=>[t.id,'value'])),inputTokens:null,outputTokens:null};}},onEvent:reporter.onEvent});
+ assert.equal(calls,1);assert.equal(result.status,'completed');assert.equal(reporter.warnings.length,1);
+ assert.match(await readFile(join(directory,'events.jsonl'),'utf8'),/report-warning/);
+ assert.equal(JSON.parse(await readFile(join(directory,'result.json'),'utf8')).status,'completed');
+ const html=await readFile(reporter.path,'utf8');assert.match(html,/Estimated input tokens/);assert.match(html,/1 responses unknown/);assert.match(html,/Actual input \/ output: Unknown \/ Unknown/);
+});
+
+test('HTML rename retries recover transient locks but surface unrelated errors',async t=>{
+ const fs=(await import('node:fs/promises')).default,original=fs.rename;
+ let attempts=0;
+ t.mock.method(fs,'rename',async(...args)=>{if(++attempts<3)throw Object.assign(new Error('busy'),{code:'EBUSY'});return original(...args);});
+ const root=await mkdtemp(join(tmpdir(),'flowname-retry-'));
+ const reporter=await createHtmlReporter(join(root,'ok'));assert.equal(attempts,3);assert.equal(reporter.warnings.length,0);
+ t.mock.method(fs,'rename',async()=>{throw Object.assign(new Error('disk failure'),{code:'EIO'});});
+ await assert.rejects(createHtmlReporter(join(root,'bad')),/disk failure/);
+});
+
+test('permanent HTML replacement lock still saves final output and full event journal',async t=>{
+ const fs=(await import('node:fs/promises')).default;
+ const directory=join(await mkdtemp(join(tmpdir(),'flowname-permanent-lock-')),'report');
+ const reporter=await createHtmlReporter(directory);
+ t.mock.method(fs,'rename',async()=>{throw Object.assign(new Error('locked'),{code:'EACCES'});});
+ const result=await recoverNames('let a=1; console.log(a);',{provider:{label:'fixture',async infer(r){return {names:Object.fromEntries(r.targets.map(t=>[t.id,'value'])),inputTokens:4,outputTokens:2};}},onEvent:reporter.onEvent});
+ assert.equal(result.status,'completed');
+ const journal=(await readFile(join(directory,'events.jsonl'),'utf8')).trim().split('\n').map(JSON.parse);
+ assert.equal(journal.at(-1).type,'complete');assert.equal(journal.filter(e=>e.type==='report-warning').length,1);
+ assert.equal(JSON.parse(await readFile(join(directory,'result.json'),'utf8')).inputTokens,4);
+ assert.match(await readFile(join(directory,'output.js'),'utf8'),/value/);
+});

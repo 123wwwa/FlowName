@@ -20,6 +20,8 @@ async function main(){
  if(reporter)console.log('Live report (open in your browser): '+pathToFileURL(reporter.path).href);
  let total=0,done=0,active=0,failed=0,retries=0,input=0,output=0,unknown=false;
  const progress=(event:RecoveryEvent)=>{
+  if(event.estimate)console.error(`${event.type==='plan'?'Plan (pass '+event.pass+')':'Request '+((event.index??0)+1)}: ${event.estimate.requests} requests, ${event.estimate.targets} targets | estimated input tokens: ~${event.estimate.inputTokens} | output token cap: ${event.estimate.outputTokenLimit}\n${event.estimate.method}`);
+  if(event.type==='response')console.error(`Request ${(event.index??0)+1}: actual tokens in/out: ${event.inputTokens??'Unknown'} / ${event.outputTokens??'Unknown'}`);
   if(event.total!==undefined)total=event.total;
   if(event.type==='request'){active++;if((event.attempt??1)>1)retries++;}
   if(event.type==='response'){

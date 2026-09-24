@@ -7,6 +7,7 @@ import {mapConcurrent,serialWriter} from './concurrency.js';
 import {priorityTargets,rebaseAnalysis} from './passes.js';
 import type {Provider,InferenceRequest,Analysis,PromptFormat} from './types.js';
 export interface RecoveryEvent {
+ estimate?:{inputTokens:number;outputTokenLimit:number;requests:number;targets:number;method:string};
  type:'plan'|'request'|'response'|'pass-complete'|'complete'; time:string;
  prompt?:string;
  index?:number; groupIndex?:number; attempt?:number; pass?:number; retrySkipped?:string;
@@ -33,6 +34,7 @@ export async function recoverNames(code:string,options:RecoveryOptions):Promise<
  const localIds=allIds.filter(id=>!prioritySet.has(id));
  const phases=passes===2&&priority.length&&localIds.length?[priority,localIds]:[allIds];
  const plan=(source:string,analysis:Analysis,ids:string[])=>budgetedRequests(source,analysis,ids,promptBytes,options.maxTargets,promptFormat);
+ const estimate=(requests:InferenceRequest[])=>({inputTokens:requests.reduce((n,r)=>n+Math.ceil(Buffer.byteLength(promptFor(r))/4),0),outputTokenLimit:requests.reduce((n,r)=>n+(128+64*r.targets.length),0),requests:requests.length,targets:requests.reduce((n,r)=>n+r.targets.length,0),method:'Rough estimate: UTF-8 prompt bytes / 4; excludes API framing, future repairs and custom-provider changes. Output limit is a cap, not predicted usage.'});
  // Preflight both sets on the original source. Pass two is rebuilt after application.
  const initialPlans=phases.map(ids=>plan(code,originalAnalysis,ids));
  let plannedCalls=initialPlans.reduce((n,requests)=>n+requests.length,0);
@@ -64,7 +66,7 @@ export async function recoverNames(code:string,options:RecoveryOptions):Promise<
    plannedCalls+=requests.length-initialPlans[phase]!.length;
    if(count+requests.length>maxCalls){warnings.push('Pass 2 skipped: updated context exceeds remaining call budget.');stop=true;break;}
   }
-  await emit({type:'plan',pass,total:plannedCalls+retries});
+  await emit({type:'plan',pass,total:plannedCalls+retries,estimate:estimate(phase===0?initialPlans.flat():requests)});
   const passNames:Record<string,string>={};
   let pendingInitial=requests.length;
   // Reserve the original pass-two estimate until its actual context is available.
@@ -78,7 +80,7 @@ export async function recoverNames(code:string,options:RecoveryOptions):Promise<
     if(count>=maxCalls){stop=true;return;}
     // Reserve an index/call slot before awaiting the observer to avoid concurrent races.
     const index=requestCounter++;count++;if(attempt===1)pendingInitial--;
-    await emit({type:'request',index,groupIndex,attempt,pass,total:plannedCalls+retries,request,prompt:promptFor(request)});
+    await emit({type:'request',index,groupIndex,attempt,pass,total:plannedCalls+retries,request,prompt:promptFor(request),estimate:estimate([request])});
     if(stop||signal?.aborted){count--;return;}
     let event:Omit<RecoveryEvent,'time'>,needsRepair=false;
     let missing=request.targets.map(t=>t.id);

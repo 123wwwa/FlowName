@@ -227,3 +227,12 @@ test('browser prompt format defaults to compact and supports verbose in both pas
  }
  const invalid=await runWorker('let a=1;','success',{promptFormat:'bad'});assert.equal(invalid.calls,0);assert.match(invalid.events[0].error,/promptFormat/);
 });
+
+test('browser bundle emits a local estimate before fetch and accounts for repairs',async()=>{
+ const {events,calls}=await runWorker('const a=1;const b=a+2;console.log(b);','partial',{rpm:6000});
+ assert.equal(calls,2);
+ assert.ok(events[0].estimate.inputTokens>0);
+ assert.equal(events[0].estimate.targets,2);
+ for(const e of events.filter(e=>e.type==='request'))assert.equal(e.estimate.inputTokens,Math.ceil(new TextEncoder().encode(e.prompt).length/4));
+ assert.equal(events.at(-1).result.inputTokens,60);assert.equal(events.at(-1).result.outputTokens,20);
+});
