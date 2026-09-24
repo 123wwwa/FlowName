@@ -7,6 +7,10 @@
 !/README.md
 !/docs/
 /docs/*
+!/docs/README.md
+!/docs/approach.md
+!/docs/limitations.md
+!/docs/experiments.md
 !/docs/guide.md
 !/docs/architecture.md
 !/docs/recovery-passes.md
