@@ -7,6 +7,7 @@ export interface SymbolInfo {
   declaration: Span;
   references: Span[];
   eligible: boolean;
+  namingRole?: 'function' | 'class';
   exclusion?: string;
 }
 export interface Definition { id: string; symbol: string; span: Span; kind: string }
@@ -24,6 +25,7 @@ export interface Analysis {
 }
 export type Strategy = 'individual' | 'batch' | 'flow' | 'flow-relations';
 export interface InferenceRequest {
+  formatRepair?: boolean;
   targets: SymbolInfo[];
   context: string;
   relations: Relation[];
@@ -37,6 +39,7 @@ export interface InferenceResult {
   usage?: Record<string, unknown>;
   rawResponse?: string;
   httpStatus?: number;
+  validation?: { unresolved: Record<string,string>; ignoredIds: string[] };
 }
 export interface Provider {
   label: string;

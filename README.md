@@ -2,19 +2,23 @@
 
 **[Try FlowName in your browser →](https://123wwwa.github.io/flowname/)** — bring your API key; no installation required.
 
-JavaScript identifier recovery with relation-aware request budgets and a live local HTML report.
+A lightweight Semantic Identifier Recoverer focused on token cost and turnaround time, with relation-aware request budgets and a live HTML report.
 
 **Alpha, not yet published to npm.** Node.js 22.8+ (tested on Node 24). The API preserves lexical bindings with scope-aware collision suffixes; it does not guarantee semantic name quality or full behavioral equivalence. Direct eval/with disables renaming. It never executes your JavaScript.
 
 ## Why FlowName exists
 
-FlowName started with a question: **can we reduce the token cost of LLM-assisted identifier recovery by asking about related variables together?**
+FlowName is a personal project for inferring useful names for identifiers whose meaning has been lost. Its scope is semantic identifier recovery, not structural deobfuscation: it does not unpack bundles, undo control-flow flattening or execute input code. AST analysis supports binding identity, inexpensive grouping and safe name application.
+
+**The design priority is useful naming at low token cost and low latency.** Additional context and inference stages have diminishing returns; maximizing naming quality regardless of expense is not the objective. Keep analysis lightweight, avoid repeated context, and require evidence that an added stage provides enough practical benefit to justify its calls, tokens and latency. Exact original-name recovery is not the goal.
+
+FlowName started with a question: **can relation-aware joint inference reduce the token cost of LLM-assisted identifier recovery by asking about related variables together?**
 
 [Humanify](https://github.com/jehna/humanify#readme) documents one LLM call per identifier with a default surrounding context of 500 characters. This is a straightforward approach, but nearby identifiers can cause repeated source context and instructions to be sent across many requests. A fixed local window can also miss relevant uses elsewhere in the code. It does not explicitly group related identifiers for joint inference.
 
 ### How JSIMPLIFIER sends naming requests
 
-We inspected the official [XingTuLab/JSIMPLIFIER implementation at commit `eaa72ae`](https://github.com/XingTuLab/JSIMPLIFIER/tree/eaa72ae63758957ac95b2f5e3391fefb96827987). Its OpenAI and Gemini naming paths work as follows:
+The source comparison uses the official [XingTuLab/JSIMPLIFIER implementation at commit `eaa72ae`](https://github.com/XingTuLab/JSIMPLIFIER/tree/eaa72ae63758957ac95b2f5e3391fefb96827987). Its OpenAI and Gemini naming paths work as follows:
 
 1. **One target name per invocation, sequentially.** `visitAllIdentifiers` collects Babel binding-identifier paths, sorts them by enclosing context size (largest first), and awaits the rename callback inside a loop. It applies each rename before preparing the next context. There is no multi-identifier response map or relation-guided target batching in these paths.
 2. **The default context setting is 1,000, not 500.** `scopeToString` stringifies a selected enclosing scope. If it is shorter than the setting, it sends it whole. For a longer non-program scope, it takes the first 1,000 JavaScript string units. For a longer program scope, it takes the first/last window near boundaries, otherwise slices from `identifier.start - 500` to `identifier.end + 500`. The central slice can therefore exceed 1,000 units by the identifier length; this is not a token budget.
@@ -34,11 +38,23 @@ See the [worked example: source → bindings → relations → requests → appl
 
 The goal is **useful names with less repeated context and fewer API calls**, rather than exact reconstruction of the author's original spelling. Each request and response is visible in the live HTML report or web playground, including proposed names, applied names and collision adjustments.
 
+### Current limitations and format recovery
+
+Recovery uses **one combined pass by default**. Select **Two passes (experimental)** in the web Recovery mode field, pass `--passes 2` to the CLI, or set `passes: 2` in the library API to enable priority-name propagation. With two passes selected, function/class declarations and bindings initialized with function, arrow or class expressions are considered first, ordered by program scope, reference count and source position. After collision-checked application, the source is reanalyzed and the remaining identifiers are planned from the updated code. Only actually applied names propagate; their IDs remain tied to the original bindings. Inputs without both categories use one pass.
+
+This implemented two-pass policy is **experimental, not a demonstrated efficiency improvement**. It divides targets rather than asking about every identifier twice, but separating related targets can create smaller groups and repeat context. An API-free planning comparison on the same full Axios input found 399 calls / 1,046,102 prompt bytes for a single combined plan versus 561 calls / 1,143,997 bytes for two target sets with names unchanged: **40.60% more requests and 9.36% more prompt bytes**. These are not measured token counts or latency, and actual first-pass names and retries may change them. See [the cost assessment](docs/pass-cost-assessment.md). Two-pass propagation is opt-in because its added cost has not been justified by measured benefit.
+
+Parseable JSON answers are accepted **per target ID**. Valid identifier names are retained, unknown IDs are ignored and logged, and only missing/invalid entries are requested again, at most once per group. Unparseable JSON is not mined for fragments: it triggers one correction for the unresolved targets. The original source context is retained with a correction instruction; already accepted IDs are excluded from the retry targets. A failed repair leaves only the unresolved identifiers unchanged.
+
+Both passes and repairs share concurrency, RPM and `maxCalls`. The original plans are checked before networking; pass two is rebuilt after renaming. If its new context cannot fit the remaining budget, the run preserves pass-one output and reports a partial result. Logs distinguish pass, group, attempt, accepted response entries, ignored IDs and unresolved targets. Authentication, quota, network, HTTP-envelope and response-size errors are not automatically retried.
+
+**Propagation does not guarantee consistency.** Requests within a pass still use a fixed source snapshot, cross-group relation facts are omitted, and incorrect first-pass names can bias the second pass. Priority is a syntactic heuristic, not a confidence score; snippets may omit useful function-body evidence. There is no recursive refinement or runtime execution. See [partial acceptance and two-pass recovery](docs/recovery-passes.md) for the exact policy and remaining limitations. Dynamic analysis is deferred.
+
 ## Preliminary Axios experiment
 
 An exploratory prototype experiment used the **entire Axios 1.20.0 browser distribution**, with identifier-only anonymization: **4,400 nonblank, noncomment input lines and 1,800 target bindings**. It included all scopes and transpiler helpers, not extracted function samples. Original names were retained for inspection but were not sent to the model.
 
-Each method ran once with `gemini-3.5-flash-lite`, temperature 0, concurrency 32 and no retries. All three methods below were implemented in our research prototype; these are **not direct benchmarks of Humanify or JSIMPLIFIER**.
+Each method ran once with `gemini-3.5-flash-lite`, temperature 0, concurrency 32 and no retries. All three methods below were implemented in the FlowName research prototype; these are **not direct benchmarks of Humanify or JSIMPLIFIER**.
 
 | Prototype method | API calls | Input tokens | Output tokens | Total tokens | Reduction vs. local-500 |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -70,7 +86,7 @@ const provider = createProvider({
   apiKey: process.env.GEMINI_API_KEY,
 });
 const result = await recoverNames(sourceCode, {
-  provider, concurrency: 4, rpm: 60, maxCalls: 1000,
+  provider, passes: 1, concurrency: 4, rpm: 60, maxCalls: 1000,
   promptBytes: 12000, maxTargets: 16,
   onEvent: reporter.onEvent,
 });
@@ -84,7 +100,7 @@ console.log(result.status, result.code);
 Build locally with `npm run build`, then:
 
 ```sh
-node dist/product-cli.js input.js --out ./new-report --provider gemini --model gemini-3.5-flash-lite --concurrency 4 --rpm 60 --max-calls 1000
+node dist/product-cli.js input.js --out ./new-report --provider gemini --model gemini-3.5-flash-lite --concurrency 4 --rpm 60 --max-calls 1000 --passes 1
 ```
 
 Set `GEMINI_API_KEY` (or `FLOWNAME_API_KEY`) in your environment. The product does not automatically load `.env`. After installation from a tarball the same command is `flowname input.js ...`.

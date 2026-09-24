@@ -1,8 +1,24 @@
 import { promptFor } from './grouping.js';
 import type { InferenceRequest, InferenceResult, Provider } from './types.js';
+import {isValidIdentifier} from '@babel/types';
 
 export class ModelResponseError extends Error {
   constructor(message:string,public rawResponse:string,public httpStatus:number,public usage?:Record<string,unknown>,public retryAfterMs?:number) {super(message);}
+}
+export class ModelFormatError extends ModelResponseError {}
+
+/** Parseable answers are evaluated per ID; never salvage fragments of invalid JSON. */
+export function acceptResponse(value:unknown,request:InferenceRequest){
+  if(!value || typeof value!=='object' || !('names' in value) || !value.names || typeof value.names!=='object' || Array.isArray(value.names))throw new Error('Response must contain a names object.');
+  const raw=value.names as Record<string,unknown>;
+  const names:Record<string,string>={},unresolved:Record<string,string>={};
+  const expected=new Set(request.targets.map(s=>s.id));
+  for(const id of expected){
+    const name=Object.hasOwn(raw,id)?raw[id]:undefined;
+    if(typeof name!=='string'||name.length>256||!isValidIdentifier(name)||['arguments','eval','await','yield'].includes(name))unresolved[id]=name===undefined?'Missing target ID.':'Invalid identifier value.';
+    else names[id]=name;
+  }
+  return {names,validation:{unresolved,ignoredIds:Object.keys(raw).filter(id=>!expected.has(id))}};
 }
 
 /** Plumbing-only test double: does not simulate semantic naming quality or token usage. */
@@ -62,12 +78,12 @@ export class CompatibleProvider implements Provider {
     try {data=JSON.parse(rawResponse);}catch {throw new ModelResponseError('Model endpoint returned invalid JSON.',rawResponse,response.status);}
     if(!data||typeof data!=='object'||!Array.isArray(data.choices))throw new ModelResponseError('Invalid response envelope.',rawResponse,response.status);
     const content = data.choices?.[0]?.message?.content;
-    if (typeof content!=='string'||!content) throw new ModelResponseError('Model returned no content.',rawResponse,response.status,data.usage);
+    if (typeof content!=='string'||!content) throw new ModelFormatError('Model returned no content.',rawResponse,response.status,data.usage);
     const tokenCount = (value: unknown) => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
-    let names:Record<string,string>;
-    try {names=validateResponse(JSON.parse(content),request);}catch(error){throw new ModelResponseError(error instanceof Error?error.message:String(error),rawResponse,response.status,data.usage);}
+    let parsed:ReturnType<typeof acceptResponse>;
+    try {parsed=acceptResponse(JSON.parse(content),request);}catch(error){throw new ModelFormatError(error instanceof Error?error.message:String(error),rawResponse,response.status,data.usage);}
     return {
-      names,
+      ...parsed,
       inputTokens: tokenCount(data.usage?.prompt_tokens), outputTokens: tokenCount(data.usage?.completion_tokens),
       usage: data.usage,
       rawResponse, httpStatus:response.status,

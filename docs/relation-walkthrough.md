@@ -2,7 +2,7 @@
 
 [Back to README](../README.md) · [Architecture](architecture.md)
 
-This example traces the current `lightweight` → `budgetedRequests` → `promptFor` → `rename` path. Binding IDs, relations, group order and prompt size below were checked by running the local implementation without an API call. The short snippet illustrates mechanics; it is not benchmark data or evidence of naming quality.
+This example isolates the `lightweight` → `budgetedRequests` → `promptFor` → `rename` building blocks by passing all eligible IDs directly to the planner. The public `recoverNames` API uses a combined single pass by default and separates priority and remaining targets only with `passes: 2`; see [the actual orchestration policy](recovery-passes.md). The one-group and split-group examples below describe a direct planner invocation, not an opted-in two-pass call sequence. Binding IDs, relations, group order and prompt size below were checked by running the local implementation without an API call. The short snippet illustrates mechanics; it is not benchmark data or evidence of naming quality.
 
 ## 1. Input and runtime meaning
 
@@ -15,7 +15,7 @@ function a(b, c) {
 }
 ```
 
-At runtime, `d` receives `b.user`, `e` receives `d.permissions`, and `e` is passed to `c` and returned. This is our reading of the source, not a runtime trace computed by FlowName. The code does not establish that `b` is an HTTP response, that `permissions` is an array, or what callback `c` does.
+At runtime, `d` receives `b.user`, `e` receives `d.permissions`, and `e` is passed to `c` and returned. This is a reading of the source, not a runtime trace computed by FlowName. The code does not establish that `b` is an HTTP response, that `permissions` is an array, or what callback `c` does.
 
 ## 2. Resolve occurrences to bindings
 
@@ -79,7 +79,7 @@ Observed request metadata:
 | Target count | 5 |
 | Source excerpt | `[0,87)` |
 | Relation facts | 6 |
-| Rendered prompt bytes | 1,764 |
+| Rendered prompt bytes | Compute with the reproduction script; the prompt template can change |
 | Omitted relation facts | 0 |
 | Reference locations not explicitly expanded | 5 |
 | Output-token allowance | 448 (`128 + 64 × 5`) |
@@ -113,7 +113,7 @@ The following is an **illustrative response**, not an actual model result:
 }
 ```
 
-The graph does not generate these words. It selects targets and supplies evidence so the model can propose names together. Missing or extra IDs invalidate the whole response for this request. Once inference finishes, the renamer validates spelling, checks scope collisions and applies the accepted names to the original AST. Assuming the illustrative names are accepted, the result is:
+The graph does not generate these words. It selects targets and supplies evidence so the model can propose names together. Valid response entries are retained per target. Unknown IDs are ignored; missing or invalid entries alone may receive one corrective retry. A failed repair preserves previously retained names. At each pass boundary, the renamer checks scope collisions and applies retained proposals to that pass source. Assuming the illustrative names are accepted, the result is:
 
 ```js
 function notifyAndGetPermissions(container, onPermissions) {
@@ -135,7 +135,7 @@ For the same input and byte budget, changing `maxTargets` to 3 produces:
 
 After request 1 claims `e` and `d`, their neighbors `b` and `c` remain. They have no direct edge to each other, but share a lexical scope, so the fallback groups them. This is a packing decision, not evidence that they have a direct value dependency.
 
-Cross-request facts `d → b` and `c → e` are absent from the transmitted relation lists. The source excerpts may still show those expressions, especially in a short example. The current planner neither duplicates target IDs across requests nor propagates names inferred in request 1 into request 2. This is where group limits can discard useful structured context.
+Cross-request facts `d → b` and `c → e` are absent from the transmitted relation lists. The source excerpts may still show those expressions, especially in a short example. Within a single planner invocation, requests have distinct initial target sets and share the same source snapshot. With `passes: 2`, the public API propagates applied priority names into its second pass; corrective attempts may repeat only unresolved IDs. This is where group limits can discard useful structured context.
 
 ## 7. Limits of the data-flow interpretation
 

@@ -13,7 +13,7 @@ flowchart TD
     Caller[Library caller or CLI] --> Core[recoverNames]
     Browser[Web playground] --> Worker[Browser or Node worker]
     Worker --> Core
-    Core --> Analyze[Lexical binding and relation analysis]
+    Core --> Analyze[Lexical analysis and pass selection]
     Analyze --> Plan[Budgeted request planning]
     Plan --> Gate[Check total planned calls]
     Gate --> Schedule[Concurrency pool and RPM pacing]
@@ -21,19 +21,21 @@ flowchart TD
     Provider <--> API[External model API]
     Provider --> Validate[Validate response target IDs and names]
     Validate --> Collect[Collect proposals]
-    Collect --> Rename[Final AST rename and collision checks]
+    Collect --> Rename[Per-pass AST rename and collision checks]
+    Rename -. after pass one: reanalyze and replan .-> Analyze
     Rename --> Result[Code, mappings, usage and status]
     Core -. progress events .-> Observer[onEvent observer]
     Observer --> UI[Live web request cards]
     Observer --> Report[Optional local HTML and JSONL reporter]
 ```
 
-`recoverNames` coordinates the pipeline. A provider is the network boundary; reporting is an optional event observer. The core does not write files or execute the submitted JavaScript. All requests are planned from the original input before inference starts. Suggestions from an earlier response do not change later prompts in that run.
+`recoverNames` coordinates the pipeline. A provider is the network boundary; reporting is an optional event observer. The core does not write files or execute the submitted JavaScript. The initial plans are checked before inference. When `passes: 2` is selected and both priority and remaining targets exist, the core applies pass-one names, reanalyzes the rewritten source and rebuilds pass two. Requests within a pass share one source snapshot. See [two-pass recovery](recovery-passes.md) for the boundary and partial-response policy.
 
 ## Module responsibilities
 
 | Module | Responsibility |
 | --- | --- |
+| [`src/passes.ts`](../src/passes.ts) | Priority target selection and verified ID rebasing after rename |
 | [`src/library.ts`](../src/library.ts) | Public API, plan gate, scheduling, event emission, failure policy and final result |
 | [`src/lightweight.ts`](../src/lightweight.ts) | Eligible bindings, source positions, reference locations and lexical relation facts |
 | [`src/request-budget.ts`](../src/request-budget.ts) | Relation-first grouping, same-scope fallback and bounded request construction |
@@ -99,7 +101,8 @@ sequenceDiagram
     participant API as Model API
     participant Rename as AST renamer
     Host->>Core: Source, provider and options
-    Core->>Core: Analyze, plan, check maxCalls
+    Core->>Core: Analyze, select passes, preflight maxCalls
+    loop Each pass (at most two)
     Core->>Observer: plan(total)
     loop Each scheduled request, with bounded overlap
         Core->>Core: Wait for RPM start slot
@@ -108,20 +111,23 @@ sequenceDiagram
         Provider->>API: Prompt and output constraints
         API-->>Provider: Response and optional usage
         Provider-->>Core: Names or error
-        Core->>Core: Validate exact target-ID set
+        Core->>Core: Accept valid entries; repair unresolved IDs at most once
         Core->>Observer: response(index, names or error, usage)
     end
-    Core->>Rename: Original source, analysis and collected proposals
+    Core->>Rename: Current pass source, analysis and retained proposals
     Rename-->>Core: Code, accepted, rejected and adjusted names
+    Core->>Observer: pass-complete(applied names)
+    Core->>Core: Reanalyze and replan if another pass remains
+    end
     Core->>Observer: complete(result)
     Core-->>Host: RecoveryResult
 ```
 
-Concurrency limits in-flight calls; RPM spaces their start times. Responses may arrive out of order. Each successful response must provide exactly the requested IDs and string names; validation failure rejects that request's response as a whole. Valid identifier spelling and binding safety are checked during final renaming.
+Concurrency limits in-flight calls; RPM spaces their start times. Responses may arrive out of order. Parseable answers retain valid target entries independently. Unknown IDs are ignored; unresolved IDs alone may receive one corrective attempt. Invalid JSON is not salvaged. Both attempts use the same pool and RPM budget. Names propagate only across the first-pass application boundary, not between requests in a pass. Valid identifier spelling and binding safety are checked during final renaming.
 
-The renamer reparses the original source and checks its hash. It resolves collisions in source order, allowing reuse in independent scopes and conservatively protecting ancestor/descendant bindings and unresolved references. Numeric suffixes handle collisions. Temporary names permit swaps before final names are applied. Generated output is parsed again for syntax validity; this is not a behavioral-equivalence test.
+The renamer reparses the current pass source and checks its hash. It resolves collisions in source order, allowing reuse in independent scopes and conservatively protecting ancestor/descendant bindings and unresolved references. Numeric suffixes handle collisions. Temporary names permit swaps before final names are applied. Generated output is parsed again for syntax validity; this is not a behavioral-equivalence test.
 
-Request-card suggestions are provisional. Final accepted names, adjustment reasons and rejected proposals become available only after the final rename pass. Original author names and semantic quality scores are not part of the product API.
+Request-card suggestions are provisional. Each pass applies accepted proposals with collision checks; pass-complete exposes applied names before the next pass. The complete result combines both passes. Original author names and semantic quality scores are not part of the product API.
 
 ## Deployment boundaries
 
@@ -149,6 +155,7 @@ Both web modes use an allowlist of Gemini, OpenAI and Groq endpoints. Pages acce
 
 | Option | Library default | Web default | Web accepted range |
 | --- | ---: | ---: | ---: |
+| `passes` | 1 | 1 | 1 or 2 |
 | `concurrency` | 4 | 16 | 1–32 |
 | `rpm` | 60 | 60 | 1–6,000 |
 | `maxCalls` | 10,000 | 1,000 | 1–10,000 |
@@ -160,8 +167,9 @@ Library and web defaults intentionally differ. Web validation runs at the worker
 | Condition | Current behavior |
 | --- | --- |
 | Analysis or planning failure | Reject before inference; no automatic splitting into separate file runs |
-| HTTP 401, 403 or 429; three consecutive failures in completion order | Stop new scheduling, drain already-started calls, finalize available proposals |
-| Other request failure | Emit error and continue unless the consecutive-failure threshold is reached; no automatic retries |
+| HTTP 401, 403 or 429; three consecutive attempts without usable names in completion order | Stop new scheduling, drain already-started calls, finalize available proposals |
+| Model-content JSON or target-ID failure | Retain valid entries; at most one corrective retry for unresolved IDs within spare budgets; log both attempts and usage |
+| Other request failure | Emit error and continue unless the consecutive-failure threshold is reached; no automatic retry |
 | Missing token usage | Aggregate token counts become `null`, rather than counting unknown usage as zero |
 | Library AbortSignal / CLI Ctrl+C | Stop scheduling and drain in-flight calls; return a cancelled result if finalization succeeds |
 | Web Stop / session timeout | Terminate worker and connections; received cards remain, but no final collision-checked output is guaranteed |
@@ -171,6 +179,6 @@ Analysis accepts up to 8 MiB of source and caps relation accumulation at 100,000
 
 ## Observability
 
-The core emits `plan`, `request`, `response` and `complete`. Web transports can additionally report `fatal`. These are execution events, not full HTTP transcripts: credentials are excluded, and the public response event contains parsed names/errors and usage rather than the entire raw provider response.
+The core emits `plan`, `request`, `response`, `pass-complete` and `complete`. Plan totals can change at the pass boundary; pass/group/attempt fields identify execution context. Web transports can additionally report `fatal`. These are execution events, not full HTTP transcripts: credentials are excluded, and the public response event contains parsed names/errors and usage rather than the entire raw provider response.
 
 The optional HTML reporter serializes writes to `events.jsonl` and replaces `index.html` through a temporary file. It refreshes every two seconds until completion, then links `output.js` and `result.json`. Browser cards consume the same core events in memory and offer a final JavaScript download; they do not use that filesystem reporter.

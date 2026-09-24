@@ -7,23 +7,27 @@ $('example').onclick=()=>{$('source').value='function a(b,c){const d=b.filter(e=
 const text=(tag,value)=>Object.assign(document.createElement(tag),{textContent:String(value??'—')});
 for (const [key, spec] of Object.entries(optionSpecs)) {
  const label=text('label',spec.label);
- const input=Object.assign(document.createElement('input'),{id:key,name:key,type:'number',min:String(spec.min),max:String(spec.max),step:'1',value:String(spec.value),required:true});
+ const input=spec.choices?Object.assign(document.createElement('select'),{id:key,name:key,required:true}):Object.assign(document.createElement('input'),{id:key,name:key,type:'number',min:String(spec.min),max:String(spec.max),step:'1',value:String(spec.value),required:true});
+ if(spec.choices){spec.choices.forEach((label,i)=>input.append(Object.assign(document.createElement('option'),{value:String(i+1),textContent:label})));input.value=String(spec.value);}
  label.append(input,text('span',spec.help));$('recovery-options').append(label);
 }
 function show(event){
- if(event.type==='plan'){total=event.total;$('status').textContent='Recovering';}
+ if(event.total!==undefined)total=event.total;
+ if(event.type==='plan'){total=event.total;$('status').textContent=`Recovering · Pass ${event.pass??1}`;}
  if(event.type==='request'){
-  if(calls.size===0)$('calls').replaceChildren();const card=document.createElement('details');card.append(text('summary',`Request ${event.index+1} · ${event.request.targets.length}identifiers · In flight`));
+  if(calls.size===0)$('calls').replaceChildren();const card=document.createElement('details');card.append(text('summary',`Request ${event.index+1} · Pass ${event.pass??1} · Group ${(event.groupIndex??event.index)+1} · Attempt ${event.attempt??1} · ${event.request.targets.length} identifiers · In flight`));
   const table=document.createElement('table');const head=document.createElement('tr');for(const label of ['Input name / ID','Suggested name','Final name','Adjustment reason'])head.append(text('th',label));table.append(head);
   const rows=new Map();for(const s of event.request.targets){const row=document.createElement('tr');for(const value of [`${s.name} / ${s.id}`,'Waiting','Pending final checks','—'])row.append(text('td',value));rows.set(s.id,row);table.append(row);}card.append(table);
   const context=document.createElement('details');context.append(text('summary','View submitted context and relations'),text('pre',JSON.stringify(event.request,null,2)));card.append(context);$('calls').append(card);calls.set(event.index,{card,rows,request:event.request});
  }
  if(event.type==='response'){
-  done++;const c=calls.get(event.index);if(c){c.card.querySelector('summary').textContent=`Request ${event.index+1} · ${event.error?'Failed':'Response received'}`;for(const [id,row] of c.rows)row.children[1].textContent=event.names?.[id]??'Response failed';if(event.error)c.card.append(text('p',event.error));}
+  done++;const c=calls.get(event.index);if(c){c.card.querySelector('summary').textContent=`Request ${event.index+1} · Pass ${event.pass??1} · Group ${(event.groupIndex??event.index)+1} · Attempt ${event.attempt??1} · ${event.error?(Object.keys(event.names??{}).length?'Partially accepted':'Failed'):'Response received'}`;for(const [id,row] of c.rows)row.children[1].textContent=event.names?.[id]??'Response failed';if(event.error)c.card.append(text('p',event.error));if(event.ignoredIds?.length)c.card.append(text('p','Ignored IDs: '+event.ignoredIds.join(', ')));if(event.unresolved&&Object.keys(event.unresolved).length)c.card.append(text('pre',JSON.stringify(event.unresolved,null,2)));if(event.retrySkipped)c.card.append(text('p','Retry skipped: '+event.retrySkipped));}
  }
+ if(event.type==='pass-complete'){for(const c of calls.values())for(const [id,row] of c.rows)if(event.applied?.[id])row.children[2].textContent=event.applied[id];}
  $('progress').textContent=`${done} / ${total}`;
  if(event.type==='complete'){
   const r=event.result;$('status').textContent=r.status==='completed'?'Completed':'Partially completed';$('renamed').textContent=Object.keys(r.accepted).length;$('tokens').textContent=`${r.inputTokens??'Unknown'} / ${r.outputTokens??'Unknown'}`;
+  if(r.warnings?.length)$('error').textContent=r.warnings.join('\n');
   for(const c of calls.values())for(const s of c.request.targets){const row=c.rows.get(s.id);row.children[2].textContent=r.accepted[s.id]??s.name;row.children[3].textContent=r.adjustments[s.id]??r.rejected[s.id]??'—';}
   finalCode=r.code;$('output').textContent=r.code;$('output-section').hidden=false;
  }

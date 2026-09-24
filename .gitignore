@@ -9,6 +9,8 @@
 /docs/*
 !/docs/guide.md
 !/docs/architecture.md
+!/docs/recovery-passes.md
+!/docs/pass-cost-assessment.md
 !/docs/relation-walkthrough.md
 !/docs/jsimplifier-requests.md
 !/src/
@@ -20,6 +22,7 @@
 !/src/html-reporter.ts
 !/src/inference.ts
 !/src/library.ts
+!/src/passes.ts
 !/src/lightweight.ts
 !/src/product-cli.ts
 !/src/provider-config.ts

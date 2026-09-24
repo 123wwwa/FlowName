@@ -26,7 +26,8 @@ async function runWorker(source, mode = 'success', options) {
       assert.equal(url, 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions');
       assert.equal(options.headers.Authorization, 'Bearer fixture-secret');
       if (mode === 'offline') throw new TypeError('Failed to fetch');
-      const names = Object.fromEntries(pending.targets.map((target, i) => [target.id, `meaningful${i}`]));
+      const targets=mode==='partial'&&calls===1?pending.targets.slice(0,1):pending.targets;
+      const names = Object.fromEntries(targets.map((target, i) => [target.id, `meaningful${i}`]));
       return new Response(JSON.stringify({choices: [{message: {content: JSON.stringify({names})}}], usage: {prompt_tokens: 30, completion_tokens: 10}}));
     },
   });
@@ -39,7 +40,7 @@ async function runWorker(source, mode = 'success', options) {
 test('static worker analyzes, calls mocked API, streams and renames without Node', async () => {
   const {events, calls} = await runWorker('const a = 1; console.log(a);');
   assert.equal(calls, 1);
-  assert.deepEqual(events.map(e => e.type), ['plan', 'request', 'response', 'complete']);
+  assert.deepEqual(events.map(e => e.type), ['plan', 'request', 'response', 'pass-complete', 'complete']);
   assert.equal(events.at(-1).result.status, 'completed');
   assert.match(events.at(-1).result.code, /const meaningful0 = 1/);
   assert.equal(events.at(-1).result.inputTokens, 30);
@@ -82,8 +83,8 @@ test('Pages assets work below a repository URL and contain no server transport',
 });
 
 test('web options enforce integer bounds and default concurrency to 16', () => {
-  assert.deepEqual(validateOptions(), {concurrency:16,rpm:60,maxCalls:1000,promptBytes:12000,maxTargets:16});
-  for (const options of [{concurrency:33},{rpm:0},{maxCalls:1.5},{promptBytes:1023},{maxTargets:65},{concurrency:'16'},null]) {
+  assert.deepEqual(validateOptions(), {passes:1,concurrency:16,rpm:60,maxCalls:1000,promptBytes:12000,maxTargets:16});
+  for (const options of [{passes:3},{passes:0},{passes:1.5},{passes:"2"},{concurrency:33},{rpm:0},{maxCalls:1.5},{promptBytes:1023},{maxTargets:65},{concurrency:'16'},null]) {
     assert.throws(()=>validateOptions(options));
   }
 });
@@ -104,4 +105,22 @@ test('browser worker applies target, prompt and call limits before API access', 
   const invalid=await runWorker(source,'success',{concurrency:33});
   assert.equal(invalid.calls,0);
   assert.match(invalid.events[0].error,/concurrency/);
+});
+
+test('browser bundle accepts partial API answers and propagates first-pass applied names',async()=>{
+  const single=await runWorker('function f(a){return a+1;} console.log(f(1));','success',{rpm:6000});
+  assert.equal(single.calls,1);
+  assert.ok(!single.events.some(e=>e.pass===2));
+  const invalid=await runWorker('let a=1;','success',{passes:3});
+  assert.equal(invalid.calls,0);
+  assert.match(invalid.events[0].error,/passes/);
+  const partial=await runWorker('const a=1,b=a+1; console.log(b);','partial',{rpm:6000});
+  assert.equal(partial.calls,2);
+  const requests=partial.events.filter(e=>e.type==='request');
+  assert.equal(requests[0].request.targets.length,2);assert.equal(requests[1].request.targets.length,1);
+  assert.equal(partial.events.at(-1).result.status,'completed');
+  const phased=await runWorker('function f(a){return a+1;} console.log(f(1));','success',{rpm:6000,passes:2});
+  const second=phased.events.find(e=>e.type==='request'&&e.pass===2);
+  assert.match(second.request.context,/function meaningful0/);
+  assert.equal(phased.events.at(-1).result.status,'completed');
 });

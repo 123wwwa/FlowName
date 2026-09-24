@@ -20,6 +20,7 @@ export function lightweight(code: string): Analysis {
       scope: `${b.scope.block.type}:${b.scope.block.start ?? 0}`, declaration: span(b.identifier),
       references: b.referencePaths.map(r => span(r.node)),
       eligible: b.kind !== 'module' && !b.path.findParent(q => q.isExportDeclaration()),
+      ...(b.path.isFunctionDeclaration() || b.path.isFunctionExpression() || (b.path.isVariableDeclarator() && t.isFunction(b.path.node.init)) ? {namingRole:'function' as const} : b.path.isClassDeclaration() || b.path.isClassExpression() || (b.path.isVariableDeclarator() && t.isClassExpression(b.path.node.init)) ? {namingRole:'class' as const} : {}),
     }); },
     WithStatement() { dynamic = true; },
     CallExpression(p) { if (t.isIdentifier(p.node.callee, {name:'eval'}) && !p.scope.getBinding('eval')) dynamic = true; },

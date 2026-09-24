@@ -9,11 +9,14 @@ export function rename(code: string, analysis: Analysis, proposed: Record<string
   if (createHash('sha256').update(code).digest('hex') !== analysis.sourceHash) throw new Error('Analysis/source hash mismatch.');
   const ast = parseCode(code);
   const bindings = new Map<string, Binding>();
+  const sourceIds = new Map(analysis.symbols.map(s=>[s.declaration.start,s.id]));
   const allNames = new Set<string>();
   const freeReferences: Array<{name:string;scope:Scope}> = [];
   traverse(ast, {
     Scopable(path) {
-      for (const binding of Object.values(path.scope.bindings)) bindings.set(`s${binding.identifier.start ?? 0}`, binding);
+      for (const binding of Object.values(path.scope.bindings)) {
+        const id=sourceIds.get(binding.identifier.start??0);if(id)bindings.set(id,binding);
+      }
     },
     Identifier(path) {
       allNames.add(path.node.name);
