@@ -19,12 +19,21 @@ export function lightweight(code: string): Analysis {
       id: `s${b.identifier.start}`, name: b.identifier.name, kind: b.kind,
       scope: `${b.scope.block.type}:${b.scope.block.start ?? 0}`, declaration: span(b.identifier),
       references: b.referencePaths.map(r => span(r.node)),
-      eligible: b.kind !== 'module' && !b.path.findParent(q => q.isExportDeclaration()),
+      eligible: b.kind !== 'module',
       ...(b.path.isFunctionDeclaration() || b.path.isFunctionExpression() || (b.path.isVariableDeclarator() && t.isFunction(b.path.node.init)) ? {namingRole:'function' as const} : b.path.isClassDeclaration() || b.path.isClassExpression() || (b.path.isVariableDeclarator() && t.isClassExpression(b.path.node.init)) ? {namingRole:'class' as const} : {}),
     }); },
     WithStatement() { dynamic = true; },
     CallExpression(p) { if (t.isIdentifier(p.node.callee, {name:'eval'}) && !p.scope.getBinding('eval')) dynamic = true; },
     ExportSpecifier(p) { const b=p.scope.getBinding(p.node.local.name); if(b && bindings.has(b)) bindings.get(b)!.eligible=false; },
+    'ExportNamedDeclaration|ExportDefaultDeclaration'(p) {
+      const declaration=(p.node as t.ExportNamedDeclaration|t.ExportDefaultDeclaration).declaration;
+      if (!declaration) return;
+      // Protect the public declaration only, not parameters or implementation locals.
+      for (const name of Object.keys(t.getOuterBindingIdentifiers(declaration))) {
+        const binding=p.scope.getBinding(name);
+        if (binding && bindings.has(binding)) bindings.get(binding)!.eligible=false;
+      }
+    },
   });
   const id = (p: NodePath) => p.isIdentifier() ? bindings.get(p.scope.getBinding(p.node.name)!)?.id : undefined;
   const refs = (p: NodePath): string[] => {

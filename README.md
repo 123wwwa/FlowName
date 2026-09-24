@@ -54,3 +54,5 @@ console.log(result.status, result.code);
 The reporter requires a new directory with an existing parent. Open its `index.html` while running; it refreshes every two seconds. Reports contain source code, responses and recovered output. Set `passes: 2` to opt into experimental two-pass recovery. After tarball installation, the CLI is also available as `flowname input.js ...`.
 
 See the **[documentation](docs/README.md)** for the approach, architecture, limitations, preliminary experiment results and detailed usage.
+
+Licensed under [MIT](LICENSE).

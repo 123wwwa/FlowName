@@ -193,3 +193,22 @@ test('CLI reports progress and makes live HTML opt-in without losing output', as
   await assert.rejects(promisify(execFile)(process.execPath,args),/EEXIST/);
  }
 });
+
+
+test('exported declarations stay public while implementation locals are recovered in both modes',async()=>{
+ for(const passes of [1,2]){
+  const source='export function sum(a){const b=a+1;return b;} export const double=(c)=>{const d=c*2;return d;}; export class Counter{constructor(e){this.value=e;}get(){const f=this.value;return f;}}';
+  const targets=[];
+  const provider={label:'exports',async infer(request){targets.push(...request.targets.map(t=>t.name));return {names:Object.fromEntries(request.targets.map(t=>[t.id,'value_'+t.id])),inputTokens:1,outputTokens:1};}};
+  const result=await recoverNames(source,{provider,passes,rpm:60000});
+  assert.equal(result.status,'completed');
+  for(const name of ['sum','double','Counter'])assert.ok(!targets.includes(name));
+  for(const name of ['a','b','c','d','e','f'])assert.ok(targets.includes(name),name);
+  const module=await import('data:text/javascript,'+encodeURIComponent(result.code));
+  assert.equal(module.sum(2),3);assert.equal(module.double(3),6);assert.equal(new module.Counter(4).get(),4);
+ }
+ const source='const a=2;export {a as value};export default function f(b){return b+a;}';
+ const result=await recoverNames(source,{provider:{label:'exports',async infer(r){assert.ok(r.targets.every(t=>!['a','f'].includes(t.name)));return {names:Object.fromEntries(r.targets.map(t=>[t.id,'parameter'])),inputTokens:1,outputTokens:1};}},rpm:60000});
+ const module=await import('data:text/javascript,'+encodeURIComponent(result.code));
+ assert.equal(module.value,2);assert.equal(module.default(3),5);
+});

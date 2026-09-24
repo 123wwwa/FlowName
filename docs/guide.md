@@ -16,7 +16,9 @@
 
 `npm test` runs offline regression tests. `npm pack` builds an installable alpha tarball with only the public entrypoints' dependency closure. It does not publish. Experiment scripts, old data/results and credentials are excluded from this product repository and package.
 
-Public npm name availability, license choice and npm publication remain release tasks. The playground supports GitHub Pages deployment; an official documentation site is a separate next step.
+FlowName uses the [MIT license](../LICENSE). Public npm name availability and npm publication remain release tasks. The playground supports GitHub Pages deployment; an official documentation site is a separate next step.
+
+`npm run test:package` builds a fresh tarball, installs it into an isolated temporary project and checks imports, strict TypeScript declarations without ambient Node types, the installed CLI, HTML reports and license inclusion. It installs test dependencies but never calls a model or publishes. Package staging is cleaned before packing. CI runs this check on Node 22.8.0 and Node 24; Pages deployment waits for these checks as well as the existing library/browser tests.
 
 
 ## Web playground

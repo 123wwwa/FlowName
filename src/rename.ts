@@ -12,6 +12,12 @@ export function rename(code: string, analysis: Analysis, proposed: Record<string
   const sourceIds = new Map(analysis.symbols.map(s=>[s.declaration.start,s.id]));
   const allNames = new Set<string>();
   const freeReferences: Array<{name:string;scope:Scope}> = [];
+  const jsxComponents = new Set<Binding>();
+  const recordWrites = (node:t.Node, scope:Scope) => {
+    for (const name of Object.keys(t.getBindingIdentifiers(node))) {
+      if (!scope.getBinding(name)) freeReferences.push({name,scope});
+    }
+  };
   traverse(ast, {
     Scopable(path) {
       for (const binding of Object.values(path.scope.bindings)) {
@@ -22,6 +28,22 @@ export function rename(code: string, analysis: Analysis, proposed: Record<string
       allNames.add(path.node.name);
       if (path.isReferencedIdentifier() && !path.scope.getBinding(path.node.name)) freeReferences.push({name:path.node.name,scope:path.scope});
     },
+    AssignmentExpression(path) { recordWrites(path.node.left,path.scope); },
+    UpdateExpression(path) { recordWrites(path.node.argument,path.scope); },
+    'ForInStatement|ForOfStatement'(path) {
+      const node=path.node as t.ForInStatement|t.ForOfStatement;
+      recordWrites(node.left,path.scope);
+    },
+    JSXIdentifier(path) {
+      const parent=path.parent;
+      const standalone=(t.isJSXOpeningElement(parent)||t.isJSXClosingElement(parent))&&parent.name===path.node;
+      const memberRoot=t.isJSXMemberExpression(parent)&&parent.object===path.node;
+      if ((!standalone&&!memberRoot)||(standalone&&t.react.isCompatTag(path.node.name))) return;
+      allNames.add(path.node.name);
+      const binding=path.scope.getBinding(path.node.name);
+      if (!binding) freeReferences.push({name:path.node.name,scope:path.scope});
+      else if (standalone) jsxComponents.add(binding);
+    },
   });
   const accepted = new Map<string, string>();
   const rejected: Record<string, string> = {};
@@ -29,6 +51,7 @@ export function rename(code: string, analysis: Analysis, proposed: Record<string
     const symbol = analysis.symbols.find(s => s.id === id);
     if (!symbol?.eligible || !bindings.has(id)) rejected[id] = 'unknown or protected symbol';
     else if (!t.isValidIdentifier(name) || ['arguments', 'eval', 'await', 'yield'].includes(name)) rejected[id] = 'invalid or restricted identifier';
+    else if (jsxComponents.has(bindings.get(id)!) && t.react.isCompatTag(name)) rejected[id] = 'JSX component name would become an intrinsic tag';
     else if (name !== symbol.name) accepted.set(id, name);
   }
   // Reserve all proposed final names, so swaps remain possible. Resolve in source

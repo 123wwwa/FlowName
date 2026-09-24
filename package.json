@@ -14,7 +14,8 @@
     "prepack": "npm run build && node scripts/build-package.mjs",
     "playground": "npm run build:pages && node web/server.mjs",
     "build:pages": "node scripts/build-pages.mjs",
-    "test:pages": "npm run build:pages && node --test --test-isolation=none test/pages.test.mjs"
+    "test:pages": "npm run build:pages && node --test --test-isolation=none test/pages.test.mjs",
+    "test:package": "node scripts/test-package.mjs"
   },
   "dependencies": {
     "@babel/generator": "^7.28.0",
@@ -49,6 +50,23 @@
   "files": [
     "package-dist",
     "README.md",
-    "docs"
-  ]
+    "docs",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/123wwwa/FlowName.git"
+  },
+  "homepage": "https://123wwwa.github.io/FlowName/",
+  "bugs": {
+    "url": "https://github.com/123wwwa/FlowName/issues"
+  },
+  "keywords": [
+    "javascript",
+    "identifier-recovery",
+    "llm",
+    "static-analysis",
+    "variable-renaming"
+  ],
+  "license": "MIT"
 }

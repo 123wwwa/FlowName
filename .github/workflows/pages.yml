@@ -14,6 +14,20 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  package:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: ['22.8.0', '24']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run test:package
+
   build:
     runs-on: ubuntu-latest
     steps:
@@ -32,7 +46,7 @@ jobs:
 
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    needs: build
+    needs: [build, package]
     runs-on: ubuntu-latest
     permissions:
       pages: write

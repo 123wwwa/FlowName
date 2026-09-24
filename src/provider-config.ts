@@ -9,7 +9,7 @@ export interface ProviderFlags {
   timeoutMs?: number;
 }
 
-export function createProvider(flags: ProviderFlags, env: NodeJS.ProcessEnv = process.env): Provider {
+export function createProvider(flags: ProviderFlags, env: Record<string,string|undefined> = process.env): Provider {
   // A model/API flag implies a real endpoint unless mock was explicitly selected.
   const provider = flags.provider ?? (flags.model || flags.apiKey || flags.baseUrl ? 'compatible' : 'mock');
   if (provider === 'mock') {

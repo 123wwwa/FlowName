@@ -5,6 +5,7 @@
 !/package-lock.json
 !/tsconfig.json
 !/README.md
+!/LICENSE
 !/docs/
 /docs/*
 !/docs/README.md
@@ -37,6 +38,7 @@
 /scripts/*
 !/scripts/build-package.mjs
 !/scripts/build-pages.mjs
+!/scripts/test-package.mjs
 !/test/
 /test/*
 !/test/product.test.mjs
