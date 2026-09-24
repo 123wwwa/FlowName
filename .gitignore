@@ -5,7 +5,6 @@
 !/package-lock.json
 !/tsconfig.json
 !/README.md
-!/AGENTS.md
 !/docs/
 /docs/*
 !/docs/guide.md
@@ -62,3 +61,7 @@
 **/.env
 **/.env.*
 **/node_modules/
+# Personal agent instructions stay local.
+**/AGENTS.md
+**/agents.md
+**/agent.md
