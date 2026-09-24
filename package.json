@@ -1,0 +1,48 @@
+{
+  "name": "flowname",
+  "version": "0.1.0-alpha.1",
+  "type": "module",
+  "description": "Analysis-guided joint JavaScript identifier recovery",
+  "engines": {
+    "node": ">=22.8.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "check": "tsc --noEmit",
+    "test": "npm run build && node --test --test-isolation=none test/product.test.mjs test/defensive.test.mjs test/concurrency.test.mjs test/rename-scopes.test.mjs test/playground.test.mjs",
+    "flowname": "node dist/product-cli.js",
+    "prepack": "npm run build && node scripts/build-package.mjs",
+    "playground": "npm run build && node web/server.mjs"
+  },
+  "dependencies": {
+    "@babel/generator": "^7.28.0",
+    "@babel/parser": "^7.28.0",
+    "@babel/traverse": "^7.28.0",
+    "@babel/types": "^7.28.0"
+  },
+  "devDependencies": {
+    "@types/babel__generator": "^7.27.0",
+    "@types/babel__traverse": "^7.28.0",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  },
+  "main": "./package-dist/library.js",
+  "types": "./package-dist/library.d.ts",
+  "exports": {
+    ".": {
+      "types": "./package-dist/library.d.ts",
+      "import": "./package-dist/library.js"
+    },
+    "./html": {
+      "types": "./package-dist/html-reporter.d.ts",
+      "import": "./package-dist/html-reporter.js"
+    }
+  },
+  "bin": {
+    "flowname": "./package-dist/product-cli.js"
+  },
+  "files": [
+    "package-dist",
+    "README.md"
+  ]
+}
