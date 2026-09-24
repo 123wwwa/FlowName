@@ -46,13 +46,13 @@ To enable automatic deployment:
 
 The workflow runs offline library and browser-bundle tests, uploads only `pages-dist/`, then deploys it. Pull requests run the same checks without publishing. It neither calls a paid model nor publishes the npm package. See [GitHub's custom Pages workflow guide](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages) for repository configuration.
 
-Browser-direct requests depend on the provider's CORS policy, available model and key restrictions. A network/CORS failure is displayed in the request log; the page does not silently relay through another server. Live provider access is not verified by the offline deployment tests. Use the local server mode below if a provider does not allow browser requests.
+Browser-direct requests depend on the provider's CORS policy, available model and key restrictions. A network/CORS failure is displayed in the request log; the page does not silently relay through another server. Live provider access is not verified by the offline deployment tests. The local preview has the same browser CORS requirements.
 
-### Local Node server
+### Local browser preview
 
-Run `npm ci` then `npm run playground` and open http://127.0.0.1:4173. Visitors to a hosted instance need only a browser, their provider API key and a model ID. The UI streams per-request contexts and suggestions, then displays final collision-checked names and a JavaScript download. Stop aborts the connection and terminates its worker; completed suggestions stay visible. Already submitted provider calls may still be billed.
+Run `npm ci` then `npm run playground` and open http://127.0.0.1:4173. This builds the same `pages-dist/` assets deployed to GitHub Pages and serves them with a small static Node server. `HOST` and `PORT` configure binding. Restart the command after source changes to rebuild.
 
-In this mode, keys and source pass through the Node host to an allowlisted provider endpoint; the application writes neither to disk or a database and never loads the host's API key. Use HTTPS when deploying publicly. Avoid request-body logging at your reverse proxy. `HOST` and `PORT` configure binding. Proxy buffering must be disabled for `/api/recover`. There are two concurrent sessions per process, 512 KB source and 20-minute per-session limits. Each session uses the same configurable options and defaults as the static playground. Model IDs are editable; suggested IDs are not an availability guarantee.
+Analysis, API calls, live events and Stop all run through the same browser worker as the hosted playground. The local server only serves HTML, JavaScript and CSS; it has no recovery endpoint and does not receive the submitted source or API key. Provider CORS requirements, run limits and cancellation behavior are identical to the hosted version. Model IDs are editable; suggested IDs are not an availability guarantee.
 
 The repository `.gitignore` is an allowlist of product sources, product tests, packaging files and the web app. Experiments, results, environment files, package artifacts, caches and generated builds stay local. Ignore rules do not remove files already tracked in an existing repository.
 
@@ -69,3 +69,9 @@ See [the detailed recovery policy](recovery-passes.md) for pass selection, call 
 Use **Single pass (default)** for a combined, cost-focused plan. **Two passes (experimental)** names functions/classes before remaining identifiers and can increase tokens and elapsed time. Both modes retain partial acceptance and bounded repairs. The selection is locked during an active web run.
 
 CLI: `flowname input.js --out ./new-report --passes 2`. Library: `recoverNames(source, {provider, passes: 2})`. Omit the option or use `1` for single-pass execution. The standalone HTML report is an observer of the selected run; its mode is selected when starting the CLI, not changed inside an already-running report.
+
+## CLI progress and optional live report
+
+The CLI always shows completed responses, in-flight calls, response errors, retries and observed input/output tokens in the terminal. Missing usage is marked as unavailable rather than counted as zero. TTY output updates in place; redirected output uses progress lines on stderr.
+
+Use `flowname input.js --out ./new-output` to save only `output.js` and `result.json`. Add `--report` to also write `events.jsonl` and a live `index.html`. The CLI prints a `file:///` URL you can open in your browser; no HTTP server or automatic browser launch is needed. The report refreshes every two seconds during recovery and remains available afterward. The output directory must be new in both modes.

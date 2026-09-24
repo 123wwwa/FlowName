@@ -12,7 +12,7 @@
     "test": "npm run build && node --test --test-isolation=none test/product.test.mjs test/defensive.test.mjs test/concurrency.test.mjs test/rename-scopes.test.mjs test/playground.test.mjs",
     "flowname": "node dist/product-cli.js",
     "prepack": "npm run build && node scripts/build-package.mjs",
-    "playground": "npm run build && node web/server.mjs",
+    "playground": "npm run build:pages && node web/server.mjs",
     "build:pages": "node scripts/build-pages.mjs",
     "test:pages": "npm run build:pages && node --test --test-isolation=none test/pages.test.mjs"
   },

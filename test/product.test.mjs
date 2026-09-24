@@ -162,3 +162,34 @@ test('concurrent format failures never spend initial-request reservations on ret
  assert.equal(new Set(requests.map(e=>e.index)).size,requests.length);
  assert.equal(requests.filter(e=>e.attempt===1).length,2);
 });
+
+
+test('CLI reports progress and makes live HTML opt-in without losing output', async () => {
+ const {execFile}=await import('node:child_process');
+ const {promisify}=await import('node:util');
+ const {writeFile,readdir}=await import('node:fs/promises');
+ const {pathToFileURL}=await import('node:url');
+ const root=await mkdtemp(join(tmpdir(),'flowname-cli-'));
+ const input=join(root,'input.js');await writeFile(input,'const a=1; console.log(a);');
+ for(const report of [false,true]) {
+  const directory=join(root,report?'with report':'plain');
+  const args=['dist/product-cli.js',input,'--out',directory,'--provider','mock','--rpm','6000',...(report?['--report']:[])];
+  const {stdout,stderr}=await promisify(execFile)(process.execPath,args);
+  assert.match(stderr,/Progress: 1\/1 responses/);
+  assert.match(stderr,/in flight.*response errors.*retries.*tokens in\/out/);
+  const result=JSON.parse(await readFile(join(directory,'result.json'),'utf8'));
+  assert.equal(result.status,'completed');
+  assert.equal(await readFile(join(directory,'output.js'),'utf8'),result.code);
+  const files=await readdir(directory);
+  if(report) {
+   assert.ok(stdout.includes(pathToFileURL(join(directory,'index.html')).href));
+   assert.ok(files.includes('events.jsonl'));
+   const events=(await readFile(join(directory,'events.jsonl'),'utf8')).trim().split('\n').map(JSON.parse);
+   assert.ok(events.some(e=>e.type==='request'));assert.ok(events.some(e=>e.type==='response'));
+   assert.match(await readFile(join(directory,'index.html'),'utf8'),/completed/);
+  } else {
+   assert.deepEqual(files.sort(),['output.js','result.json']);assert.ok(!stdout.includes('Live report'));
+  }
+  await assert.rejects(promisify(execFile)(process.execPath,args),/EEXIST/);
+ }
+});

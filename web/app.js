@@ -1,4 +1,4 @@
-import {runRecovery} from './transport.js';
+import {runRecovery} from './browser-transport.js';
 import {optionSpecs, validateOptions} from './options.js';
 const $=id=>document.getElementById(id);let controller=null,finalCode='',total=0,done=0;const calls=new Map();
 const providers={gemini:'gemini-3.5-flash-lite',openai:'gpt-5-mini',groq:'openai/gpt-oss-20b'};

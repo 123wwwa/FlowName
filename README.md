@@ -12,7 +12,7 @@ Identifiers are resolved to lexical bindings, keeping identical spellings in dif
 
 ## Web playground
 
-Open the link above, provide your JavaScript, enter your API key and choose a model. Adjust concurrency, RPM, call limits and grouping budgets, then start recovery. Follow requests and proposed names live; use **Stop** to interrupt a run. In the hosted playground, API requests go directly from your browser to the provider.
+Open the link above, provide your JavaScript, enter your API key and choose a model. Adjust concurrency, RPM, call limits and grouping budgets, then start recovery. Follow requests and proposed names live; use **Stop** to interrupt a run. API requests go directly from your browser to the provider. For the same playground locally, run `npm ci` then `npm run playground` and open http://127.0.0.1:4173.
 
 Recovery defaults to one pass. Select **Two passes (experimental)** to propagate function/class names before inferring remaining names; this may increase cost.
 
@@ -23,10 +23,10 @@ From a local checkout:
 ```sh
 npm ci
 npm run build
-node dist/product-cli.js input.js --out ./new-report --provider gemini --model gemini-3.5-flash-lite --concurrency 4 --rpm 60 --max-calls 1000 --passes 1
+node dist/product-cli.js input.js --out ./new-report --report --provider gemini --model gemini-3.5-flash-lite --concurrency 4 --rpm 60 --max-calls 1000 --passes 1
 ```
 
-Set `GEMINI_API_KEY` (or `FLOWNAME_API_KEY`) in your environment. The CLI does not automatically load `.env`. Use a new output directory and open its `index.html` to watch recovery. Set `--passes 2` to opt into experimental two-pass recovery.
+Set `GEMINI_API_KEY` (or `FLOWNAME_API_KEY`) in your environment. The CLI does not automatically load `.env`. Use a new output directory. Progress appears in the terminal; add `--report` to save a live HTML report and print its browser link (refreshes every two seconds). Without `--report`, only `output.js` and `result.json` are saved. Set `--passes 2` to opt into experimental two-pass recovery.
 
 ## Library
 

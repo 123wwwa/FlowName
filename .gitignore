@@ -51,8 +51,6 @@
 !/web/app.js
 !/web/style.css
 !/web/server.mjs
-!/web/worker.mjs
-!/web/transport.js
 !/web/options.js
 !/web/browser-transport.js
 !/web/browser-worker.js

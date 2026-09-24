@@ -11,7 +11,7 @@ For a concrete input and its actual binding IDs, graph facts and request groups,
 ```mermaid
 flowchart TD
     Caller[Library caller or CLI] --> Core[recoverNames]
-    Browser[Web playground] --> Worker[Browser or Node worker]
+    Browser[Web playground] --> Worker[Browser Web Worker]
     Worker --> Core
     Core --> Analyze[Lexical analysis and pass selection]
     Analyze --> Plan[Budgeted request planning]
@@ -136,18 +136,16 @@ flowchart LR
     Pages[GitHub Pages static assets] --> Page[Browser UI]
     Page <-->|postMessage events| BW[Browser Web Worker]
     BW <-->|Direct HTTPS requests| API[Selected API provider]
-    Local[Local Node-mode browser UI] <-->|POST and NDJSON events| Server[Node HTTP server]
-    Server <-->|Worker messages| NW[Node worker thread]
-    NW <-->|HTTPS requests| API
+    Server[Local static preview server] --> Page
 ```
 
 | Mode | Execution and transport | Key and source handling |
 | --- | --- | --- |
 | GitHub Pages | [`browser-transport.js`](../web/browser-transport.js) starts [`browser-worker.js`](../web/browser-worker.js); worker bundles the shared core and calls the provider directly | Input lives in the browser; selected prompt context and key go to the provider. No FlowName backend or browser-storage persistence |
-| Local Node server | [`transport.js`](../web/transport.js) posts to [`server.mjs`](../web/server.mjs); [`worker.mjs`](../web/worker.mjs) runs the core; events return as NDJSON | Full submitted source and key pass through the local server to its worker; no application file/database persistence |
+| Local preview | [`server.mjs`](../web/server.mjs) serves the same `pages-dist/` build; the browser uses the same worker and direct API calls as Pages | Source and key stay in the browser until provider requests; the static server has no recovery API |
 | Library or CLI | Runs in the caller's Node process with the chosen provider | Caller controls input, credentials and persistence; the optional HTML reporter writes source context and results |
 
-Both web modes use an allowlist of Gemini, OpenAI and Groq endpoints. Pages access depends on provider CORS. The browser build substitutes its transport and provides Buffer and SHA-256 adapters; it does not load the Node HTTP server or filesystem reporter.
+Both web modes use an allowlist of Gemini, OpenAI and Groq endpoints. Both depend on provider CORS. The shared browser build provides Buffer and SHA-256 adapters; it does not load the Node HTTP server or filesystem reporter.
 
 [`build-pages.mjs`](../scripts/build-pages.mjs) produces `pages-dist`. [GitHub Actions](../.github/workflows/pages.yml) runs offline tests and publishes that directory on `main`; pull requests only validate. Model keys are not required for building or deploying. The Node library package is built separately and is not published by this workflow.
 
@@ -162,7 +160,7 @@ Both web modes use an allowlist of Gemini, OpenAI and Groq endpoints. Pages acce
 | `promptBytes` | 12,000 | 12,000 | 1,024–1,048,576 |
 | `maxTargets` | 16 | 16 | 1–64 |
 
-Library and web defaults intentionally differ. Web validation runs at the worker boundary and, in Node mode, at the server boundary. Fields are locked while a run is active.
+Library and web defaults intentionally differ. Web validation runs at the browser worker boundary. Fields are locked while a run is active.
 
 | Condition | Current behavior |
 | --- | --- |
