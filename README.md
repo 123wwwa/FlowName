@@ -87,5 +87,6 @@ Set `GEMINI_API_KEY` (or `FLOWNAME_API_KEY`) in your environment. The product do
 
 ## Documentation
 
+- [Architecture and execution diagrams](docs/architecture.md)
 - [Contract, limits, development and deployment](docs/guide.md)
 - [JSIMPLIFIER request implementation and source references](docs/jsimplifier-requests.md)

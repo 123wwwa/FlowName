@@ -8,6 +8,7 @@
 !/docs/
 /docs/*
 !/docs/guide.md
+!/docs/architecture.md
 !/docs/jsimplifier-requests.md
 !/src/
 /src/*
