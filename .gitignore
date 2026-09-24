@@ -24,6 +24,7 @@
 !/scripts/
 /scripts/*
 !/scripts/build-package.mjs
+!/scripts/build-pages.mjs
 !/test/
 /test/*
 !/test/product.test.mjs
@@ -31,6 +32,7 @@
 !/test/concurrency.test.mjs
 !/test/rename-scopes.test.mjs
 !/test/playground.test.mjs
+!/test/pages.test.mjs
 !/web/
 /web/*
 !/web/index.html
@@ -38,6 +40,16 @@
 !/web/style.css
 !/web/server.mjs
 !/web/worker.mjs
+!/web/transport.js
+!/web/browser-transport.js
+!/web/browser-worker.js
+!/web/browser-globals.js
+!/web/browser-crypto.js
+!/.github/
+/.github/*
+!/.github/workflows/
+/.github/workflows/*
+!/.github/workflows/pages.yml
 !/examples/
 /examples/*
 !/examples/offline-demo.mjs

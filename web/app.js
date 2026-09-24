@@ -1,3 +1,4 @@
+import {runRecovery} from './transport.js';
 const $=id=>document.getElementById(id);let controller=null,finalCode='',total=0,done=0;const calls=new Map();
 const providers={gemini:'gemini-3.5-flash-lite',openai:'gpt-5-mini',groq:'openai/gpt-oss-20b'};
 $('provider').onchange=()=>{$('model').value=providers[$('provider').value];$('models').replaceChildren(Object.assign(document.createElement('option'),{value:$('model').value}));};
@@ -29,11 +30,7 @@ $('form').onsubmit=async e=>{
  e.preventDefault();if(controller)return;controller=new AbortController();calls.clear();done=0;total=0;finalCode='';$('calls').replaceChildren();$('error').textContent='';$('status').textContent='Analyzing';$('output-section').hidden=true;$('renamed').textContent='—';$('tokens').textContent='—';$('progress').textContent='0 / 0';$('run').disabled=true;$('stop').disabled=false;
  const payload={source:$('source').value,provider:$('provider').value,model:$('model').value.trim(),apiKey:$('key').value.trim()};$('key').value='';
  try{
-  const response=await fetch('/api/recover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:controller.signal});payload.apiKey='';
-  if(!response.ok)throw new Error((await response.json()).error??`HTTP ${response.status}`);
-  const reader=response.body.getReader(),decoder=new TextDecoder();let buffer='',completed=false;
-  while(true){const {value,done:end}=await reader.read();buffer+=decoder.decode(value,{stream:!end});let split;while((split=buffer.indexOf('\n'))>=0){const line=buffer.slice(0,split);buffer=buffer.slice(split+1);if(line){const event=JSON.parse(line);show(event);if(event.type==='complete')completed=true;}}if(end)break;}
-  if(!completed)throw new Error('The connection closed. Received suggestions are preserved.');
+  await runRecovery(payload,controller.signal,show);
  }catch(error){if(error.name!=='AbortError'){$('error').textContent=error.message;$('status').textContent='Run failed';}}
  finally{payload.apiKey='';controller=null;$('run').disabled=false;$('stop').disabled=true;}
 };

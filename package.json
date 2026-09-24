@@ -12,7 +12,9 @@
     "test": "npm run build && node --test --test-isolation=none test/product.test.mjs test/defensive.test.mjs test/concurrency.test.mjs test/rename-scopes.test.mjs test/playground.test.mjs",
     "flowname": "node dist/product-cli.js",
     "prepack": "npm run build && node scripts/build-package.mjs",
-    "playground": "npm run build && node web/server.mjs"
+    "playground": "npm run build && node web/server.mjs",
+    "build:pages": "node scripts/build-pages.mjs",
+    "test:pages": "npm run build:pages && node --test --test-isolation=none test/pages.test.mjs"
   },
   "dependencies": {
     "@babel/generator": "^7.28.0",
@@ -21,9 +23,12 @@
     "@babel/types": "^7.28.0"
   },
   "devDependencies": {
+    "@noble/hashes": "^2.4.0",
     "@types/babel__generator": "^7.27.0",
     "@types/babel__traverse": "^7.28.0",
     "@types/node": "^24.0.0",
+    "buffer": "^6.0.3",
+    "esbuild": "^0.28.2",
     "typescript": "^5.9.0"
   },
   "main": "./package-dist/library.js",

@@ -10,7 +10,7 @@ export function createPlayground({spawnWorker=(data)=>new Worker(new URL('./work
   for(const [k,v] of Object.entries(headers))res.setHeader(k,v);
   const fail=(status,message)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify({error:message}));};
   if(req.method==='GET'){
-   const files={'/':'index.html','/app.js':'app.js','/style.css':'style.css'};const file=files[req.url];if(!file)return fail(404,'Not found');
+   const files={'/':'index.html','/app.js':'app.js','/transport.js':'transport.js','/style.css':'style.css'};const file=files[req.url];if(!file)return fail(404,'Not found');
    try{const content=await readFile(new URL(file,import.meta.url));res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html; charset=utf-8');res.end(content);}catch{fail(500,'Asset unavailable');}return;
   }
   if(req.method!=='POST'||req.url!=='/api/recover')return fail(404,'Not found');

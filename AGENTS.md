@@ -10,13 +10,15 @@ Current goal: npm library, live HTML reports and install-free web playground. Ex
 - src/rename.ts: scope-aware collision handling; no source execution.
 - web/server.mjs + worker.mjs: allowlisted upstreams, ephemeral keys, isolated per-session work, disconnect cancellation.
 - web/index.html, app.js, style.css: browser playground; no localStorage/key persistence.
+- web/browser-worker.js, browser-transport.js: static Pages mode, direct provider calls and worker termination on Stop.
+- scripts/build-pages.mjs, .github/workflows/pages.yml: browser bundle and automatic Pages deployment; publish only pages-dist.
 
 ## Verification
-npm test runs product-only offline tests, including web validation, disconnect cleanup and key redaction. npm run playground builds and serves locally at127.0.0.1:4173. npm pack stages the public dependency closure via scripts/build-package.mjs. Never publish automatically. Package name/license and public hosting are not finalized.
+npm test runs product-only offline tests, including web validation, disconnect cleanup and key redaction. npm run test:pages builds and tests the actual browser bundle with mocked API responses, including cancellation and no Node globals. npm run playground builds and serves Node mode locally at127.0.0.1:4173. npm pack stages the public dependency closure via scripts/build-package.mjs. Never publish npm automatically. Package name/license are not finalized. The user authorized automatic website deployment through GitHub Actions on main; repository Pages settings must select GitHub Actions.
 
-Web Stop terminates worker and fetch connections; provider billing may still apply to submitted calls. The library AbortSignal instead drains in-flight requests. Live proposals are provisional until final rename. Keys/source pass through the web host: do not claim browser-direct or zero-knowledge hosting. Use HTTPS and disable proxy request-body logs for public hosting.
+Web Stop terminates worker and fetch connections; provider billing may still apply to submitted calls. The library AbortSignal instead drains in-flight requests. Live proposals are provisional until final rename. In Node mode keys/source pass through the host; use HTTPS and disable proxy body logs. In Pages mode keys/context go directly to the API provider from a browser worker; no FlowName backend or key persistence. Never embed a shared key in the bundle or Actions configuration. Browser-direct access depends on provider CORS; offline tests do not prove live model availability.
 
-Keep product sources/tests/scripts referenced by package.json tracked. Do not use ignored experimental sources as dependencies of product builds or tests. Historical quality/token claims are not guarantees. Current request requires website implementation, not publication.
+Keep product sources/tests/scripts referenced by package.json tracked. Do not use ignored experimental sources as dependencies of product builds or tests. Historical quality/token claims are not guarantees. The deployment workflow publishes the static playground after tests; PRs only validate. The flowname subdirectory is intended to become the GitHub repository root.
 
 ## Language policy
 
