@@ -85,7 +85,7 @@ export async function recoverNames(code:string,options:RecoveryOptions):Promise<
      let parsed:ReturnType<typeof acceptResponse>;
      try{parsed=acceptResponse({names:response.names},request);}catch(error){
       // Usage has already been recorded for this custom-provider response.
-      throw Object.assign(new ModelFormatError(error instanceof Error?error.message:'Invalid names.',response.rawResponse??'',response.httpStatus??200),{usageRecorded:true});
+      throw Object.assign(new ModelFormatError(error instanceof Error?error.message:'Invalid names.',response.rawResponse??'',response.httpStatus??200,{prompt_tokens:response.inputTokens,completion_tokens:response.outputTokens}),{usageRecorded:true});
      }
      const unresolved={...parsed.validation.unresolved,...response.validation?.unresolved};
      // Only unresolved IDs belonging to this request may be retried.

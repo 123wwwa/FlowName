@@ -24,7 +24,12 @@ export function lightweight(code: string): Analysis {
     }); },
     WithStatement() { dynamic = true; },
     CallExpression(p) { if (t.isIdentifier(p.node.callee, {name:'eval'}) && !p.scope.getBinding('eval')) dynamic = true; },
-    ExportSpecifier(p) { const b=p.scope.getBinding(p.node.local.name); if(b && bindings.has(b)) bindings.get(b)!.eligible=false; },
+    ExportSpecifier(p) {
+      // A re-export references another module, not a same-spelled local binding.
+      if (p.parentPath.isExportNamedDeclaration() && p.parentPath.node.source) return;
+      const b=p.scope.getBinding(p.node.local.name);
+      if(b && bindings.has(b)) bindings.get(b)!.eligible=false;
+    },
     'ExportNamedDeclaration|ExportDefaultDeclaration'(p) {
       const declaration=(p.node as t.ExportNamedDeclaration|t.ExportDefaultDeclaration).declaration;
       if (!declaration) return;

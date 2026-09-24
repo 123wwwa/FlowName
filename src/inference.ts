@@ -7,6 +7,37 @@ export class ModelResponseError extends Error {
 }
 export class ModelFormatError extends ModelResponseError {}
 
+/** Validate JSON normally, then inspect object keys before duplicate spelling is lost.
+ * The iterative scan skips string contents and tracks each object independently.
+ * JSON.parse has already validated syntax, so a string followed by ':' is a key.
+ */
+function parseUniqueJson(text:string):unknown {
+  const value:unknown=JSON.parse(text);
+  const containers:Array<Set<string>|null>=[];
+  for(let i=0;i<text.length;){
+    const char=text[i];
+    if(char==='{'){containers.push(new Set());i++;}
+    else if(char==='['){containers.push(null);i++;}
+    else if(char==='}'||char===']'){containers.pop();i++;}
+    else if(char==='"'){
+      const start=i++;
+      while(i<text.length){
+        if(text[i]==='\\'){i+=2;continue;}
+        if(text[i++]==='"')break;
+      }
+      let next=i;
+      while(next<text.length&&' \t\r\n'.includes(text[next]!))next++;
+      if(text[next]===':'){
+        const key:string=JSON.parse(text.slice(start,i));
+        const keys=containers.at(-1)!;
+        if(keys!.has(key))throw new Error('Duplicate JSON object key.');
+        keys!.add(key);
+      }
+    }else i++;
+  }
+  return value;
+}
+
 /** Parseable answers are evaluated per ID; never salvage fragments of invalid JSON. */
 export function acceptResponse(value:unknown,request:InferenceRequest){
   if(!value || typeof value!=='object' || !('names' in value) || !value.names || typeof value.names!=='object' || Array.isArray(value.names))throw new Error('Response must contain a names object.');
@@ -81,7 +112,7 @@ export class CompatibleProvider implements Provider {
     if (typeof content!=='string'||!content) throw new ModelFormatError('Model returned no content.',rawResponse,response.status,data.usage);
     const tokenCount = (value: unknown) => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
     let parsed:ReturnType<typeof acceptResponse>;
-    try {parsed=acceptResponse(JSON.parse(content),request);}catch(error){throw new ModelFormatError(error instanceof Error?error.message:String(error),rawResponse,response.status,data.usage);}
+    try {parsed=acceptResponse(parseUniqueJson(content),request);}catch(error){throw new ModelFormatError(error instanceof Error?error.message:String(error),rawResponse,response.status,data.usage);}
     return {
       ...parsed,
       inputTokens: tokenCount(data.usage?.prompt_tokens), outputTokens: tokenCount(data.usage?.completion_tokens),

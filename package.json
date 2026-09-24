@@ -9,13 +9,14 @@
   "scripts": {
     "build": "tsc",
     "check": "tsc --noEmit",
-    "test": "npm run build && node --test --test-isolation=none test/product.test.mjs test/defensive.test.mjs test/concurrency.test.mjs test/rename-scopes.test.mjs test/playground.test.mjs",
+    "test": "npm run build && node --test --test-isolation=none test/product.test.mjs test/defensive.test.mjs test/concurrency.test.mjs test/rename-scopes.test.mjs test/playground.test.mjs test/edge-cases.test.mjs",
     "flowname": "node dist/product-cli.js",
     "prepack": "npm run build && node scripts/build-package.mjs",
     "playground": "npm run build:pages && node web/server.mjs",
     "build:pages": "node scripts/build-pages.mjs",
     "test:pages": "npm run build:pages && node --test --test-isolation=none test/pages.test.mjs",
-    "test:package": "node scripts/test-package.mjs"
+    "test:package": "node scripts/test-package.mjs",
+    "test:edges": "npm run build && node --test --test-isolation=none test/edge-cases.test.mjs"
   },
   "dependencies": {
     "@babel/generator": "^7.28.0",

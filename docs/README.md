@@ -1,5 +1,7 @@
 # FlowName documentation
 
+- [Pre-release edge-case audit](edge-case-audit.md): test coverage, reproduced failures and their fixes.
+
 [Project introduction and quick start](../README.md)
 
 - [Motivation and approach](approach.md): design goals, related tools and relation-guided requests.

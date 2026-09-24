@@ -18,6 +18,7 @@
 !/docs/pass-cost-assessment.md
 !/docs/relation-walkthrough.md
 !/docs/jsimplifier-requests.md
+!/docs/edge-case-audit.md
 !/src/
 /src/*
 !/src/analysis.ts
@@ -47,6 +48,7 @@
 !/test/rename-scopes.test.mjs
 !/test/playground.test.mjs
 !/test/pages.test.mjs
+!/test/edge-cases.test.mjs
 !/web/
 /web/*
 !/web/index.html
