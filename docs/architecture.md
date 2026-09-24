@@ -4,6 +4,8 @@
 
 This document describes the current product implementation. The README explains the motivation and preliminary experiments; the diagrams below show how the shipped library and playground actually work. GitHub renders the Mermaid diagrams directly.
 
+For a concrete input and its actual binding IDs, graph facts and request groups, see the [relation walkthrough](relation-walkthrough.md).
+
 ## System overview
 
 ```mermaid

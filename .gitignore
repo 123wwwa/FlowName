@@ -9,6 +9,7 @@
 /docs/*
 !/docs/guide.md
 !/docs/architecture.md
+!/docs/relation-walkthrough.md
 !/docs/jsimplifier-requests.md
 !/src/
 /src/*

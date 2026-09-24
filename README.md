@@ -26,7 +26,11 @@ These request builders send the target name and source text, without an explicit
 
 ### FlowName's approach
 
-FlowName addresses the repeated-request limitation through a lightweight semantic relation graph: lexical bindings, references, assignments, property accesses, arguments and return relations guide which identifiers share a request. Remaining singletons can be grouped within the same lexical scope. Request budgets bound group size and context, and AST renaming applies validated suggestions with collision handling. This is lightweight relation extraction, not complete JavaScript data-flow or alias analysis.
+FlowName first resolves identifier occurrences to lexical bindings, so identical spellings in different scopes remain distinct targets. It then extracts syntactic relations from assignments, property accesses, call participants and returns. The request planner follows connections between targets and falls back to remaining bindings in the seed's scope, bounded by group size and prompt bytes. Each request contains target IDs, merged declaration excerpts and in-group relation facts. Reference locations are collected for analysis but are not all expanded into prompt context. This is lightweight relation extraction, not complete JavaScript data-flow or alias analysis.
+
+For example, `const d = b.user; const e = d.permissions; c(e);` connects `d` to `b`, `e` to `d`, and callback `c` to argument `e`. Property facts retain `user` and `permissions` as evidence. This lets the planner ask for several related names together, rather than independently repeating nearby code for each target. The graph selects and describes evidence; the LLM still proposes the names, and AST renaming checks their application.
+
+See the [worked example: source → bindings → relations → requests → applied names](docs/relation-walkthrough.md), including exact IDs and grouping output verified with the current planner, and what changes when a group must be split.
 
 The goal is **useful names with less repeated context and fewer API calls**, rather than exact reconstruction of the author's original spelling. Each request and response is visible in the live HTML report or web playground, including proposed names, applied names and collision adjustments.
 
