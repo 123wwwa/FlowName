@@ -14,6 +14,22 @@ Identifiers are resolved to lexical bindings, keeping identical spellings in dif
 
 **Experimental alpha.** Requires Node.js 22.8+. APIs may change; review recovered code before using it.
 
+## How FlowName compares with Humanify
+
+Both tools use static analysis to distinguish bindings and apply LLM-proposed names. FlowName also uses lightweight relations to decide which targets share a request and which evidence fits the prompt budget.
+
+| Stage | Humanify | FlowName |
+| --- | --- | --- |
+| Implementation and analysis | Rust with Oxc | TypeScript with Babel |
+| Identifier identity | Scopes and symbols | Scopes and lexical bindings |
+| Request planning | Select context for one binding at a time | Group connected targets, with remaining targets from the same scope as a fallback |
+| Evidence sent to the LLM | Selected source context and the target name | Target IDs, declaration excerpts, bounded use excerpts and in-group relation facts |
+| LLM response | One proposed name | Proposed names keyed by target ID |
+| Applying names | Symbol-based renaming with collision and reference-capture checks | Binding-based renaming with collision and reference-capture checks |
+
+Humanify's Oxc layer parses the source, resolves symbols and emits renamed code; it does not perform structural deobfuscation in this naming pipeline. See its [rename implementation](https://github.com/jehna/humanify/blob/main/src/rename/walker.rs) and [LLM prompt](https://github.com/jehna/humanify/blob/main/src/llm/renamer.rs). This is an architectural comparison, not a comparative safety or performance benchmark.
+
+
 ## Web playground
 
 Open the link above, provide your JavaScript, enter your API key and choose a model. Adjust concurrency, RPM, call limits and grouping budgets, then start recovery. Follow requests, actual token usage and proposed names live; use **Stop** to interrupt a run. API requests go directly from your browser to the provider. For the same playground locally, run `npm ci` then `npm run playground` and open http://127.0.0.1:4173.
