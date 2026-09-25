@@ -19,7 +19,7 @@ export function budgetedRequests(code:string,analysis:Analysis,ids:string[],budg
   const merged:Array<[number,number]>=[];
   for(const r of ranges){const last=merged.at(-1);if(last&&r[0]<=last[1])last[1]=Math.max(last[1],r[1]);else merged.push([...r]);}
   const context=merged.map(([a,b])=>`\n/* excerpt [${a},${b}); may be partial */\n${code.slice(a,b)}\n`).join('');
-  const request:InferenceRequest={promptFormat,targets:targets.map(s=>({...s,references:[]})),context,relations:[],defUses:[],definitions:[]};
+  const request:InferenceRequest={promptFormat,targets:targets.map(s=>({...s,references:[]})),context,contextRanges:merged.map(([start,end])=>({start,end})),relations:[],defUses:[],definitions:[]};
   const facts=[...new Set(group.flatMap(id=>evidence.get(id)!))].filter(r=>set.has(r.from)&&set.has(r.to));
   let omitted=0;
   for(const r of facts){if(request.relations.length>=64){omitted++;continue;}request.relations.push(r);if(Buffer.byteLength(promptFor(request))>budget){request.relations.pop();omitted++;}}
@@ -67,6 +67,7 @@ export function budgetedRequests(code:string,analysis:Analysis,ids:string[],budg
    const bytes=Buffer.byteLength(promptFor(request));
    if(bytes>budget||bytes-initial>2048){request.context=prior;omitted++;continue;}
    accepted.push(use);included++;request.budgeting.promptBytes=bytes;
+   request.contextRanges=[...request.contextRanges!,use.span,...use.guards.map(g=>g.span)];
   }
   const visible=[...declarations,...accepted.flatMap(u=>[u.span,...u.guards.map(g=>g.span)])];
   const unexpanded=request.targets.reduce((n,t)=>n+symbols.get(t.id)!.references.filter(ref=>!visible.some(r=>r.start<=ref.start&&r.end>=ref.end)).length,0);

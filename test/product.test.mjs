@@ -345,3 +345,16 @@ test('context mode validation precedes provider calls and pass-two uses follow r
  const changed=rename(source,before,{[fn.id]:'calculateValue'}),after=rebaseAnalysis(changed.code,before,changed.accepted);
  for(const symbol of after.symbols)for(const use of after.usageContexts[symbol.id])assert.ok(changed.code.slice(use.span.start,use.span.end).includes(symbol.name));
 });
+
+test('CLI input-only invocation uses defaults and creates separate output directories',async()=>{
+ const {createServer}=await import('node:http');const {execFile}=await import('node:child_process');const {promisify}=await import('node:util');const {resolve}=await import('node:path');const {writeFile,readdir}=await import('node:fs/promises');
+ const root=await mkdtemp(join(tmpdir(),'flowname-defaults-'));const source='const a=1;console.log(a);';await writeFile(join(root,'input.js'),source);
+ let calls=0;const server=createServer(async(req,res)=>{let raw='';for await(const c of req)raw+=c;const body=JSON.parse(raw);assert.equal(body.model,'gemini-3.5-flash-lite');const prompt=body.messages[0].content;const payload=JSON.parse(prompt.split('\n').find(l=>l.startsWith('{')));assert.ok(!('scope' in payload.targets[0]));calls++;res.setHeader('Content-Type','application/json');res.end(JSON.stringify({choices:[{message:{content:JSON.stringify({names:Object.fromEntries(payload.targets.map(t=>[t.id,'value']))})}}],usage:{prompt_tokens:10,completion_tokens:3}}));});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));
+ try{const env={...process.env,GEMINI_API_KEY:'fixture',FLOWNAME_API_KEY:'fixture',FLOWNAME_BASE_URL:`http://127.0.0.1:${server.address().port}`};delete env.FLOWNAME_MODEL;
+ for(let i=0;i<2;i++){const {stdout}=await promisify(execFile)(process.execPath,[resolve('dist/product-cli.js'),'input.js'],{cwd:root,env});assert.match(stdout,/Output directory: .*flowname-output-/);}
+ const dirs=(await readdir(root)).filter(n=>n.startsWith('flowname-output-'));assert.equal(dirs.length,2);assert.equal(calls,2);
+ for(const d of dirs){assert.deepEqual((await readdir(join(root,d))).sort(),['output.js','result.json']);assert.equal(JSON.parse(await readFile(join(root,d,'result.json'),'utf8')).status,'completed');}
+ assert.equal(await readFile(join(root,'input.js'),'utf8'),source);
+ }finally{await new Promise(r=>server.close(r));}
+});

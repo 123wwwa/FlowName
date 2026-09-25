@@ -72,11 +72,23 @@ Use **Single pass (default)** for a combined, cost-focused plan. **Two passes (e
 
 CLI: `flowname input.js --out ./new-report --passes 2`. Library: `recoverNames(source, {provider, passes: 2})`. Omit the option or use `1` for single-pass execution. The standalone HTML report is an observer of the selected run; its mode is selected when starting the CLI, not changed inside an already-running report.
 
-## CLI progress and optional live report
+## CLI defaults and optional live report
 
 The CLI always shows completed responses, in-flight calls, response errors, retries and observed input/output tokens in the terminal. Missing usage is marked as unavailable rather than counted as zero. TTY output updates in place; redirected output uses progress lines on stderr.
 
-Use `flowname input.js --out ./new-output` to save only `output.js` and `result.json`. Add `--report` to also write `events.jsonl` and a live `index.html`. The CLI prints a `file:///` URL you can open in your browser; no HTTP server or automatic browser launch is needed. The report refreshes every two seconds during recovery and remains available afterward. The output directory must be new in both modes.
+Run `flowname input.js` with your API key in `GEMINI_API_KEY` or `FLOWNAME_API_KEY`; no flags are required. The CLI does not load `.env` automatically. It creates a unique `flowname-output-TIMESTAMP-ID` directory relative to the current working directory and prints the absolute path. Repeated runs create separate directories and do not overwrite the input. Use `--out ./new-output` to choose a new directory explicitly. By default, only `output.js` and `result.json` are saved. Add `--report` to also write `events.jsonl` and a live `index.html`. The CLI prints a `file:///` URL you can open in your browser; no HTTP server or automatic browser launch is needed. The report refreshes every two seconds during recovery and remains available afterward. An explicit output directory must be new in both modes.
+
+| Option | Default |
+| --- | --- |
+| Provider / model | Gemini / `gemini-3.5-flash-lite` |
+| Concurrency / RPM | 4 / 60 |
+| Maximum calls | 10,000 |
+| Passes | 1 |
+| Prompt format / source context | `compact` / `usage` |
+| Prompt bytes / targets per request | 12,000 / 16 |
+| HTML report | Off; enable with `--report` |
+
+`FLOWNAME_MODEL` and `FLOWNAME_BASE_URL` override the default model and endpoint; explicit flags take precedence. Default call limits are ceilings, not an instruction to spend that many calls. Use `--max-calls` for a smaller limit. Run `flowname --help` for optional overrides.
 
 ## Prompt format
 

@@ -9,7 +9,7 @@ test('large scope budgets preserve every target and declaration exactly once',()
  const a=lightweight(code),ids=a.symbols.map(s=>s.id);
  const requests=budgetedRequests(code,a,ids,4000,16);
  assert.deepEqual(requests.flatMap(r=>r.targets.map(s=>s.id)).sort(),[...ids].sort());
- for(const r of requests){assert.ok(Buffer.byteLength(promptFor(r))<=4000);for(const s of r.targets)assert.ok(contextCovers(r.context,s.declaration));}
+ for(const r of requests){assert.ok(Buffer.byteLength(promptFor(r))<=4000);for(const s of r.targets)assert.ok(contextCovers(r.contextRanges,s.declaration));}
  assert.throws(()=>budgetedRequests(code,a,[ids[0],ids[0]]),/Duplicate/);
  assert.throws(()=>lightweight(' '.repeat(8*1024*1024+1)),/limit/);
 });

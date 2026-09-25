@@ -64,3 +64,10 @@ Original impact: the event journal and terminal progress disagreed with the fina
 The timeout fixture injects a transport TimeoutError; it verifies retry and usage behavior, not real elapsed-time timeout enforcement. JSX classification is checked structurally here; this is not a browser rendering suite. No new claims are made about reflection, indirect eval or classic-script global properties, which remain documented limitations.
 
 All three fixes were authorized and verified. The local initial failure output remains in `release-audit/edge-suite-output.txt` as a historical record, not the current test status; it is not part of the published package.
+
+## September 25: analysis and source-coverage regressions
+
+- Both lexical and CFG analyzers now protect potential direct eval even when the callee has a local binding. An authored fixture passes the intrinsic evaluator as a parameter and verifies that the protected result still returns 42 without model calls.
+- The CFG analyzer checks constantViolations as well as referencePaths for cross-function access. Write-only closure assignments, updates, compound/destructuring writes and loop targets force conservative reaching definitions; same-function assignments retain the structured path. The lexical product path makes no reaching-definition claim.
+- CFG export protection now matches the lexical path: public bindings remain protected, parameters and implementation locals stay eligible, and re-exports do not protect unrelated locals.
+- Declaration coverage uses structured source ranges, never markers parsed from source comments. Full-source and excerpt requests preserve literal marker-like comments; budget reduction removes complete excerpts and their ranges together. Coverage ranges are internal metadata and are excluded from model prompt serialization.

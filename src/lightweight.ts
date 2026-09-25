@@ -24,7 +24,7 @@ export function lightweight(code: string): Analysis {
       ...(b.path.isFunctionDeclaration() || b.path.isFunctionExpression() || (b.path.isVariableDeclarator() && t.isFunction(b.path.node.init)) ? {namingRole:'function' as const} : b.path.isClassDeclaration() || b.path.isClassExpression() || (b.path.isVariableDeclarator() && t.isClassExpression(b.path.node.init)) ? {namingRole:'class' as const} : {}),
     }); },
     WithStatement() { dynamic = true; },
-    CallExpression(p) { if (t.isIdentifier(p.node.callee, {name:'eval'}) && !p.scope.getBinding('eval')) dynamic = true; },
+    CallExpression(p) { if (t.isIdentifier(p.node.callee, {name:'eval'})) dynamic = true; },
     ExportSpecifier(p) {
       // A re-export references another module, not a same-spelled local binding.
       if (p.parentPath.isExportNamedDeclaration() && p.parentPath.node.source) return;

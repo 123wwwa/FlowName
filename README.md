@@ -21,10 +21,18 @@ Prompt format defaults to **Compact**, preserving IDs, source and relation facts
 Run the alpha CLI without a global installation:
 
 ```sh
-npx --package=flowname@alpha flowname input.js --out ./new-report --report --provider gemini --model gemini-3.5-flash-lite --concurrency 4 --rpm 60 --max-calls 1000 --passes 1 --prompt-format compact
+npx --package=flowname@alpha flowname input.js
 ```
 
-Set `GEMINI_API_KEY` (or `FLOWNAME_API_KEY`) in your environment. The CLI does not automatically load `.env`. Use a new output directory. Progress appears in the terminal; add `--report` to save a live HTML report and print its browser link (refreshes every two seconds). Without `--report`, only `output.js` and `result.json` are saved. Set `--passes 2` to opt into experimental two-pass recovery.
+Set `GEMINI_API_KEY` (or `FLOWNAME_API_KEY`) in your environment first; the CLI does not automatically load `.env`. No flags are required. Defaults are Gemini 3.5 Flash-Lite, concurrency 4, RPM 60, up to 10,000 calls, one pass, compact prompts and bounded use context. `FLOWNAME_MODEL` and `FLOWNAME_BASE_URL` can override the model and endpoint.
+
+Each run creates a unique `flowname-output-TIMESTAMP-ID` folder in the current directory containing `output.js` and `result.json`. Add `--report` for a live HTML report and its browser link:
+
+```sh
+npx --package=flowname@alpha flowname input.js --report
+```
+
+Use flags only to override defaults, for example `--out ./my-output`, `--model MODEL` or `--max-calls 1000`. An explicitly selected output directory must be new. See `flowname --help` and the [CLI guide](docs/guide.md#cli-defaults-and-optional-live-report).
 
 ## Library
 

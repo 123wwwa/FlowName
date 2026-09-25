@@ -26,7 +26,7 @@ export function analyze(code: string): Analysis {
       for (const binding of Object.values(path.scope.bindings)) {
         if (bindings.has(binding)) continue;
         const declaration = span(binding.identifier);
-        const excluded = binding.kind === 'module' || !!binding.path.findParent(p => p.isExportDeclaration());
+        const excluded = binding.kind === 'module';
         bindings.set(binding, {
           id: `s${declaration.start}`, name: binding.identifier.name, kind: binding.kind,
           scope: `${binding.scope.block.type}:${binding.scope.block.start ?? 0}`, declaration,
@@ -38,7 +38,7 @@ export function analyze(code: string): Analysis {
     Function(path) { functions.push(path.node); },
     WithStatement() { dynamicScope = true; },
     CallExpression(path) {
-      if (t.isIdentifier(path.node.callee, { name: 'eval' }) && !path.scope.getBinding('eval')) dynamicScope = true;
+      if (t.isIdentifier(path.node.callee, { name: 'eval' })) dynamicScope = true;
     },
   });
   traverse(ast, {
@@ -48,19 +48,28 @@ export function analyze(code: string): Analysis {
       if (symbol) symbolAt.set(path.node, symbol.id);
     },
     ExportSpecifier(path) {
+      if (path.parentPath.isExportNamedDeclaration() && path.parentPath.node.source) return;
       const binding = path.scope.getBinding(path.node.local.name);
       const symbol = binding && bindings.get(binding);
       if (symbol) { symbol.eligible = false; symbol.exclusion = 'exported binding'; }
+    },
+    'ExportNamedDeclaration|ExportDefaultDeclaration'(path) {
+      const declaration=(path.node as t.ExportNamedDeclaration|t.ExportDefaultDeclaration).declaration;
+      if(!declaration)return;
+      for(const name of Object.keys(t.getOuterBindingIdentifiers(declaration))){
+        const binding=path.scope.getBinding(name),symbol=binding&&bindings.get(binding);
+        if(symbol){symbol.eligible=false;symbol.exclusion='exported declaration';}
+      }
     },
   });
   if (dynamicScope) {
     warnings.add('Direct eval or with: all renames disabled for this module.');
     for (const symbol of bindings.values()) { symbol.eligible = false; symbol.exclusion = 'dynamic scope'; }
   }
-  // Cross-function reads require an interprocedural model. Use conservative fallback.
+  // Cross-function reads or writes require an interprocedural model.
   for (const [binding] of bindings) {
     const owner = binding.scope.getFunctionParent();
-    if (binding.referencePaths.some(p => p.scope.getFunctionParent() !== owner)) {
+    if ([...binding.referencePaths,...binding.constantViolations].some(p => p.scope.getFunctionParent() !== owner)) {
       warnings.add('Closure/cross-function references: conservative reaching definitions.');
     }
   }

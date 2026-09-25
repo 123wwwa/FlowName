@@ -3,15 +3,8 @@ import type { Analysis, InferenceRequest, Strategy, SymbolInfo, Span } from './t
 export interface GroupOptions { maxSymbols: number; maxPromptChars: number; contextChars: number; excerptChars?: number; fullContext?: boolean }
 export const defaultGroupOptions: GroupOptions = { maxSymbols: 12, maxPromptChars: 16000, contextChars: 6000 };
 
-export function contextCovers(context: string, span: Span): boolean {
-  const matches = [...context.matchAll(/\/\* excerpt \[(\d+),(\d+)\); may be partial \*\/\n/g)];
-  return matches.some((match, index) => {
-    const start = Number(match[1]);
-    const bodyStart = match.index! + match[0].length;
-    const bodyEnd = index + 1 < matches.length ? matches[index + 1].index! - 1 : context.length;
-    const end = Math.min(Number(match[2]), start + Math.max(0, bodyEnd - bodyStart - 1));
-    return span.start >= start && span.end <= end;
-  });
+export function contextCovers(ranges: readonly Span[], span: Span): boolean {
+  return ranges.some(range=>range.start<=span.start&&range.end>=span.end);
 }
 
 export function promptFor(request: InferenceRequest): string {
@@ -83,13 +76,14 @@ export function buildRequests(code: string, analysis: Analysis, strategy: Strate
     if (options.fullContext) {
       context = `\n/* excerpt [0,${code.length}); may be partial */\n${code}\n`;
       if (context.length > budget) throw new Error('Full source exceeds contextChars.');
+      intervals.splice(0,intervals.length,[0,code.length]);
     }
     const explicit = strategy === 'flow-relations';
     const defUses = explicit ? analysis.uses.filter(u => ids.has(u.symbol)) : [];
     const definitions = explicit ? analysis.definitions.filter(d => ids.has(d.symbol) || defUses.some(u => u.definitions.includes(d.id))) : [];
     return {
       // Reference locations are analysis artifacts, not necessary prompt overhead.
-      targets: group.map(s => ({ ...s, references: [] })), context,
+      targets: group.map(s => ({ ...s, references: [] })), context,contextRanges:intervals.map(([start,end])=>({start,end})),
       relations: explicit ? analysis.relations.filter(r => ids.has(r.from) && ids.has(r.to)) : [],
       defUses, definitions,
     };
@@ -97,7 +91,7 @@ export function buildRequests(code: string, analysis: Analysis, strategy: Strate
   const requests: InferenceRequest[] = [];
   const fit = (group: SymbolInfo[]) => {
     let request = make(group, options.contextChars);
-    if ((promptFor(request).length > options.maxPromptChars || group.some(s => !contextCovers(request.context, s.declaration))) && group.length > 1) {
+    if ((promptFor(request).length > options.maxPromptChars || group.some(s => !contextCovers(request.contextRanges!, s.declaration))) && group.length > 1) {
       const middle = Math.ceil(group.length / 2); fit(group.slice(0, middle)); fit(group.slice(middle)); return;
     }
     // Huge single bindings: bound evidence and context rather than exceed the budget.
@@ -106,9 +100,13 @@ export function buildRequests(code: string, analysis: Analysis, strategy: Strate
       request.definitions = request.definitions.filter(d => request.defUses.some(u => u.definitions.includes(d.id)));
       request.relations = request.relations.slice(0, Math.floor(request.relations.length / 2));
     }
-    while (promptFor(request).length > options.maxPromptChars && request.context.length) request.context = request.context.slice(0, Math.floor(request.context.length / 2));
+    // Remove whole structured excerpts; never infer source coverage from source comments.
+    while (promptFor(request).length > options.maxPromptChars && request.contextRanges!.length) {
+      request.contextRanges!.pop();
+      request.context=request.contextRanges!.map(({start,end})=>`\n/* excerpt [${start},${end}); may be partial */\n${code.slice(start,end)}\n`).join('');
+    }
     if (!request.context || promptFor(request).length > options.maxPromptChars) throw new Error(`Prompt budget too small for ${group.map(s => s.id).join(',')}; increase maxPromptChars/contextChars.`);
-    if (group.some(s => !contextCovers(request.context, s.declaration))) throw new Error('Prompt budget cannot fit target declaration; increase the budget.');
+    if (group.some(s => !contextCovers(request.contextRanges!, s.declaration))) throw new Error('Prompt budget cannot fit target declaration; increase the budget.');
     requests.push(request);
   };
   groups.forEach(fit);

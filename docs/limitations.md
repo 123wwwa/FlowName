@@ -2,7 +2,7 @@
 
 [Documentation](README.md) · [Project README](../README.md)
 
-FlowName does not guarantee semantic name quality or full behavioral equivalence. Direct eval/with disables renaming. It never executes input JavaScript.
+FlowName does not guarantee semantic name quality or full behavioral equivalence. Potential direct `eval(...)` calls and `with` disable renaming for the whole input. A local binding named `eval` does not prove safety: it can receive the intrinsic evaluator. This intentionally also protects calls to a same-named ordinary function. It never executes input JavaScript.
 
 Name application protects unresolved identifier reads and writes, including assignment patterns and loop targets. A proposal that would turn a JSX component into an intrinsic tag (for example, `A` to `widget` in `<A />`) is rejected and the original binding is retained. Exported declarations and import bindings remain protected; parameters and local bindings inside exported functions/classes can be recovered.
 

@@ -241,3 +241,8 @@ test('browser exposes bounded uses and declaration baseline without changing gro
  const plans=[];for(const contextMode of ['declarations','usage']){const {events}=await runWorker(source,'success',{contextMode,rpm:6000});const requests=events.filter(e=>e.type==='request');plans.push(requests.map(e=>e.request.targets.map(t=>t.id)));if(contextMode==='usage')assert.ok(requests.some(e=>e.prompt.includes('switch discriminant')));}
  assert.equal(JSON.stringify(plans[0]),JSON.stringify(plans[1]));
 });
+
+test('browser protects shadowed intrinsic eval without sending a request',async()=>{
+ const {events,calls}=await runWorker('function f(eval){let secret=42;return eval("secret");}f(globalThis.eval);');
+ assert.equal(calls,0);assert.equal(events.at(-1).result.status,'completed');assert.match(events.at(-1).result.code,/secret/);assert.match(events.at(-1).result.warnings.join(' '),/eval/);
+});
