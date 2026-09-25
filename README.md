@@ -2,7 +2,7 @@
 
 **[Try FlowName in your browser →](https://123wwwa.github.io/FlowName/)** — bring your API key; no installation required.
 
-FlowName is a lightweight **Semantic Identifier Recoverer** for JavaScript, focused on useful names, bounded LLM requests and scope-aware renaming. It groups related identifiers into compact prompts to reduce repeated context, with token cost and speed as design priorities. A live report makes each request, response and applied name visible. Use it as an npm library, a CLI or an install-free browser playground.
+FlowName is a **lightweight Semantic Identifier Recoverer** for JavaScript, focused on useful names, bounded LLM requests and scope-aware renaming. It groups related identifiers into compact prompts to reduce repeated context, with token cost and speed as design priorities. A live report makes each request, response and applied name visible. Use it as an npm library, a CLI or an install-free browser playground.
 
 **Why grouped requests?** [Humanify](https://github.com/jehna/humanify#note-on-token-usage) documents one LLM call per identifier with a configurable context window of 500 characters by default. This can repeat instructions and overlapping source context across requests. FlowName groups related identifiers into compact, budgeted requests to reduce that repetition. [Preliminary experiments](docs/experiments.md) show lower token usage against an internal per-identifier baseline; they are not a direct Humanify benchmark and do not establish lower latency or equivalent naming quality.
 
