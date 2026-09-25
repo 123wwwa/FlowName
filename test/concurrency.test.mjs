@@ -1,7 +1,30 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mapConcurrent,serialWriter} from '../dist/concurrency.js';
+import {mapConcurrent,mapDependent,serialWriter} from '../dist/concurrency.js';
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+test('dependent jobs leave slots for unrelated work and preserve dependency order',async()=>{
+ const log=[];let release;const gate=new Promise(resolve=>release=resolve);
+ await mapDependent([0,1,2],[[],[0],[]],2,async i=>{
+  log.push(`start${i}`);
+  if(i===0)await gate;
+  if(i===2)release();
+  log.push(`end${i}`);
+ });
+ assert.ok(log.indexOf('start2')<log.indexOf('end0'));
+ assert.ok(log.indexOf('end0')<log.indexOf('start1'));
+ await assert.rejects(mapDependent([0],[[0]],1,async()=>{}),/earlier jobs/);
+});
+test('dependency pool drains errors and never starts waiting children after stop',async()=>{
+ let stop=false;const started=[];
+ await mapDependent([0,1,2],[[],[0],[]],2,async i=>{started.push(i);await delay(1);stop=true;},()=>stop);
+ assert.deepEqual(started,[0,2]);
+ let drained=false;
+ await assert.rejects(mapDependent([0,1,2],[[],[0],[]],2,async i=>{
+  if(i===0)throw new Error('observer failed');
+  await delay(5);drained=true;
+ }),/observer failed/);
+ assert.equal(drained,true);
+});
 test('worker pool overlaps requests, enforces limit and returns in original order',async()=>{
   let active=0,peak=0;const seen=[];
   const result=await mapConcurrent([0,1,2,3,4,5],3,async(value)=>{

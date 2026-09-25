@@ -8,6 +8,95 @@ import {recoverNames} from '../dist/library.js';
 import {createHtmlReporter} from '../dist/html-reporter.js';
 import {CompatibleProvider} from '../dist/inference.js';
 import {promptFor} from '../dist/grouping.js';
+import {propagationPlan,withPreviousNames} from '../dist/propagation.js';
+import {lightweight} from '../dist/lightweight.js';
+import {budgetedRequests} from '../dist/request-budget.js';
+
+test('linked propagation passes bounded hints, retains them during repair, and is off by default',async()=>{
+ const source='let a=1;let b=a+2;globalThis.answer=b;';
+ for(const mode of [undefined,'linked']){
+  const requests=[],events=[];let repaired=false;
+  const result=await recoverNames(source,{requestPropagation:mode,maxTargets:1,concurrency:2,rpm:600000,provider:{label:'fixture',async infer(r){
+   requests.push(r);
+   if(r.targets[0].name==='b'&&!repaired){repaired=true;return {names:{},inputTokens:1,outputTokens:1};}
+   return {names:Object.fromEntries(r.targets.map(t=>[t.id,t.name==='a'?'seedValue':'totalValue'])),inputTokens:1,outputTokens:1};
+  }},onEvent:e=>events.push(e)});
+  assert.equal(result.status,'completed');assert.equal(result.calls,3);
+  assert.equal(runInNewContext(result.code+'answer'),3);
+  const second=requests.filter(r=>r.targets[0].name==='b');
+  assert.equal(second.length,2);
+  for(const r of second){
+   if(mode){assert.equal(r.previousNames[0].suggested,'seedValue');assert.equal(r.propagation.included,1);assert.match(promptFor(r),/unverified suggestions/);}
+   else assert.equal(r.previousNames,undefined);
+  }
+  if(mode)assert.ok(events.findIndex(e=>e.type==='response'&&e.groupIndex===0)<events.findIndex(e=>e.type==='request'&&e.groupIndex===1));
+ }
+});
+
+test('propagation uses bound occurrences and direct relations, not spelling or shared scope',()=>{
+ const source='let a=1;let b=a+2;function f(){let a=3;return a;}';
+ const analysis=lightweight(source),requests=budgetedRequests(source,analysis,analysis.symbols.filter(s=>s.eligible).map(s=>s.id),12000,1);
+ const plan=propagationPlan(requests,analysis);
+ const inner=analysis.symbols.filter(s=>s.name==='a').at(-1);
+ const innerIndex=requests.findIndex(r=>r.targets[0].id===inner.id);
+ assert.ok(!plan[innerIndex].some(c=>c.name==='a'));
+ const bIndex=requests.findIndex(r=>r.targets[0].name==='b');
+ assert.equal(plan[bIndex][0].name,'a');
+ const r=requests[bIndex],id=plan[bIndex][0].id;
+ const noBudget=withPreviousNames(r,plan[bIndex],{[id]:'seed'},Buffer.byteLength(promptFor(r)),0);
+ assert.equal(noBudget.previousNames.length,0);assert.equal(noBudget.propagation.addedPromptBytes,0);
+ for(const format of ['compact','verbose']){
+  const enriched=withPreviousNames({...r,promptFormat:format},plan[bIndex],{[id]:'seed'},12000,0);
+  assert.ok(enriched.propagation.addedPromptBytes<=1024);
+  assert.ok(Buffer.byteLength(promptFor(enriched))<=12000);
+  assert.equal(enriched.context,r.context);
+ }
+});
+
+test('linked groups proceed without hints after failure and stop after cancellation',async()=>{
+ const source='let a=1;let b=a+2;globalThis.answer=b;';
+ let calls=0;
+ const result=await recoverNames(source,{requestPropagation:'linked',maxTargets:1,rpm:600000,provider:{label:'fixture',async infer(r){
+  calls++;if(calls===1)throw new Error('network failure');
+  assert.deepEqual(r.previousNames,[]);
+  return {names:Object.fromEntries(r.targets.map(t=>[t.id,t.name])),inputTokens:1,outputTokens:1};
+ }}});
+ assert.equal(calls,2);assert.equal(result.status,'partial');
+ const controller=new AbortController();calls=0;
+ const cancelled=await recoverNames(source,{requestPropagation:'linked',maxTargets:1,rpm:600000,signal:controller.signal,provider:{label:'fixture',async infer(r){
+  calls++;controller.abort();return {names:Object.fromEntries(r.targets.map(t=>[t.id,'seed'])),inputTokens:1,outputTokens:1};
+ }}});
+ assert.equal(calls,1);assert.equal(cancelled.status,'cancelled');
+ await assert.rejects(recoverNames(source,{requestPropagation:'invalid',provider:{}}),/requestPropagation/);
+});
+
+test('partial predecessor names survive a failed repair and reach only later groups',async()=>{
+ const seen=[];
+ const result=await recoverNames('let a=1;let b=a+2;let c=a+b;console.log(c);',{
+  requestPropagation:'linked',maxTargets:2,rpm:600000,provider:{label:'partial fixture',async infer(r){
+   seen.push(r);
+   if(seen.length===1)return {names:{[r.targets[0].id]:'seed'},inputTokens:1,outputTokens:1};
+   if(r.formatRepair)throw new Error('repair unavailable');
+   assert.equal(r.previousNames.length,1);assert.equal(r.previousNames[0].suggested,'seed');
+   return {names:Object.fromEntries(r.targets.map(t=>[t.id,t.name])),inputTokens:1,outputTokens:1};
+  }}});
+ assert.equal(seen.length,3);assert.equal(result.status,'partial');
+ assert.equal(seen[1].formatRepair,true);
+});
+
+test('propagation caps candidates and bytes and excludes invisible relations',()=>{
+ const symbols=Array.from({length:22},(_,i)=>({id:`s${i}`,name:`a${i}`,kind:'let',scope:'scope',declaration:{start:i*10,end:i*10+2},references:[],eligible:true}));
+ const requests=symbols.map(s=>({targets:[s],context:'source',contextRanges:[{start:0,end:1000}],relations:[],definitions:[],defUses:[]}));
+ const analysis={symbols,relations:symbols.slice(0,-1).map(s=>({from:s.id,to:'s21',kind:'assignment',span:{start:0,end:1}}))};
+ const candidates=propagationPlan(requests,analysis).at(-1);
+ assert.equal(candidates.length,16);
+ const names=Object.fromEntries(symbols.map(s=>[s.id,'longSuggestedName'.repeat(3)]));
+ const enriched=withPreviousNames(requests.at(-1),candidates,names,12000,0);
+ assert.ok(enriched.propagation.addedPromptBytes<=1024);
+ assert.ok(enriched.propagation.included>0&&enriched.propagation.omitted>0);
+ requests.at(-1).contextRanges=[{start:210,end:212}];
+ assert.equal(propagationPlan(requests,analysis).at(-1).length,0);
+});
 
 test('single pass is default and invalid pass counts fail before inference',async()=>{
  const events=[];let calls=0;

@@ -18,3 +18,24 @@ export function serialWriter(write:(value:string)=>Promise<unknown>) {
   let tail:Promise<unknown>=Promise.resolve();
   return (value:string)=>{tail=tail.then(()=>write(value));return tail;};
 }
+
+/** Only ready jobs occupy slots. Earlier-index dependencies form an acyclic graph. */
+export async function mapDependent<T>(items:readonly T[],dependencies:readonly number[][],limit:number,work:(item:T,index:number)=>Promise<void>,shouldStop:()=>boolean=()=>false):Promise<void>{
+ if(!Number.isSafeInteger(limit)||limit<1||limit>32)throw new Error('Concurrency must be an integer from 1 to 32.');
+ if(dependencies.length!==items.length||dependencies.some((deps,i)=>deps.some(d=>!Number.isSafeInteger(d)||d<0||d>=i)))throw new Error('Dependencies must refer to earlier jobs.');
+ const pending=new Set(items.map((_,i)=>i)),done=new Set<number>();
+ const running=new Map<number,Promise<{index:number;error?:unknown;failed:boolean}>>();
+ let failure:unknown,hasFailure=false;
+ while(pending.size||running.size){
+  if(!hasFailure&&!shouldStop())for(const i of pending){
+   if(running.size>=limit)break;
+   if(!dependencies[i]!.every(d=>done.has(d)))continue;
+   pending.delete(i);
+   running.set(i,Promise.resolve().then(()=>work(items[i]!,i)).then(()=>({index:i,failed:false}),error=>({index:i,error,failed:true})));
+  }
+  if(!running.size)break;
+  const result=await Promise.race(running.values());running.delete(result.index);done.add(result.index);
+  if(result.failed&&!hasFailure){failure=result.error;hasFailure=true;}
+ }
+ if(hasFailure)throw failure;
+}

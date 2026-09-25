@@ -29,6 +29,8 @@ export interface Analysis {
 export type Strategy = 'individual' | 'batch' | 'flow' | 'flow-relations';
 export type PromptFormat = 'compact' | 'verbose';
 export interface InferenceRequest {
+  previousNames?: Array<{id:string;name:string;at:number;suggested:string}>;
+  propagation?: {dependsOn:number[];included:number;omitted:number;addedPromptBytes:number};
   contextRanges?: Span[];
   promptFormat?: PromptFormat;
   formatRepair?: boolean;

@@ -45,7 +45,7 @@ At the first boundary, only valid proposals are applied through `rename`. Numeri
 
 Example: `function f(a){return a+1;}` first targets `f`. If `f` becomes `increment`, the second pass receives source containing `function increment(a)` and targets only `a`. The parameter keeps its original ID even though its current declaration offset moved. First-pass bindings are not proposed again in pass two; local collisions are adjusted around those applied names. Combined result mappings continue to use original IDs.
 
-The LLM is explicitly told that existing source names may be previous suggestions and are not verified semantics. Prompts still use bounded declaration excerpts: the applied name may not appear in every distant excerpt. There is no global name dictionary injected into every request, no cross-request propagation within a pass, and no third pass. Earlier failures are not silently requeued as second-pass targets.
+The LLM is explicitly told that existing source names may be previous suggestions and are not verified semantics. Prompts still use bounded declaration excerpts: the applied name may not appear in every distant excerpt. There is no global name dictionary injected into every request, no cross-request propagation within a pass by default, and no third pass. Earlier failures are not silently requeued as second-pass targets. Optional [linked request propagation](guide.md#linked-request-propagation-experimental) supplies bounded, unverified hints within each pass without rewriting that pass's source.
 
 ## Shared budgets and stopping
 

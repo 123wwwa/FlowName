@@ -36,6 +36,8 @@ Open the link above, provide your JavaScript, enter your API key and choose a mo
 
 Prompt format defaults to **Compact**, preserving IDs, source and relation facts with less metadata. Select **Verbose** for the previous format. Recovery defaults to one pass. Select **Two passes (experimental)** to propagate function/class names before inferring remaining names; this may increase cost.
 
+**Names between requests** defaults to **Independent**. Choose **Linked names (experimental)** to let related later groups receive bounded name suggestions from earlier responses while unrelated groups remain parallel. This may increase tokens and latency. CLI: `--request-propagation linked`; library: `requestPropagation: 'linked'`. See the [propagation policy](docs/guide.md#linked-request-propagation-experimental).
+
 ## CLI
 
 Run the alpha CLI without a global installation:

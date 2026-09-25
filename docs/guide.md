@@ -66,6 +66,20 @@ Parseable responses retain valid entries per ID. Unknown IDs are ignored and log
 
 See [the detailed recovery policy](recovery-passes.md) for pass selection, call reservations, stable IDs, cancellation and event accounting. A completed run can have failedCalls greater than zero when repair succeeds. Unknown usage remains null. Log cards show pass, group, attempt, unresolved reasons and ignored IDs.
 
+## Linked request propagation (experimental)
+
+Independent requests remain the default (`requestPropagation: 'off'`). Enable `requestPropagation: 'linked'` in the library, `--request-propagation linked` in the CLI, or **Names between requests → Linked names (experimental)** in the playground.
+
+The initial groups and source excerpts stay unchanged. A later group waits only for selected earlier groups whose targets have a direct extracted relation to its own targets and a declaration or reference occurrence inside its submitted source ranges. Matching uses binding IDs and source offsets, not shared spelling or scope alone. Edges point from earlier to later plan indices, so cycles in source relations cannot cause a scheduling deadlock. Dependencies are selected in plan order, not by semantic confidence or model completion time. Waiting groups consume no worker slots; other ready groups run concurrently under the existing concurrency, RPM and call limits.
+
+After each predecessor finishes its initial attempt and any permitted repair, valid proposals can be attached as `previousNames` entries containing `id`, original `name`, the visible occurrence offset `at`, and `suggested`. These are unverified hints, not final applied names or additional rename targets. The source is not rewritten between requests. Final collision checks may change or reject a suggestion; wrong early interpretations can bias later names.
+
+At most 16 candidate bindings are selected per group. The hints and their instruction may add at most 1,024 UTF-8 prompt bytes and must fit the remaining total `promptBytes` budget. Existing source evidence is never removed to make room. Missing, unchanged or oversized suggestions are omitted; a dependency may therefore yield no hints. This mode does not add initial calls or regroup targets, but may increase input tokens and latency and change repair outcomes. No quality or efficiency improvement is established.
+
+Failed predecessors do not prevent dependent groups from using their original context unless the run's existing stop policy is triggered. Partial valid responses remain usable. Repairs retain the same hints and still obey the byte and call budgets. Cancellation stops new groups and drains active library calls; the browser Stop button terminates the worker. With two-pass recovery, dependencies are rebuilt within each pass; the existing collision-checked application boundary still separates passes.
+
+Request logs include the exact prompt, `previousNames`, and `propagation` metadata (`dependsOn` as zero-based group indices, included/omitted candidate counts, added prompt bytes). Omitted counts cover the selected candidates, not every relation discarded by the 16-candidate cap. The HTML report and playground expose these in request details. Custom providers must use `previousNames` themselves or use `promptFor`-equivalent prompt construction to benefit; receiving the field alone does not force a provider to transmit it.
+
 ## Selecting a recovery mode
 
 Use **Single pass (default)** for a combined, cost-focused plan. **Two passes (experimental)** names functions/classes before remaining identifiers and can increase tokens and elapsed time. Both modes retain partial acceptance and bounded repairs. The selection is locked during an active web run.
@@ -83,7 +97,7 @@ Run `flowname input.js` with your API key in `GEMINI_API_KEY` or `FLOWNAME_API_K
 | Provider / model | Gemini / `gemini-3.5-flash-lite` |
 | Concurrency / RPM | 4 / 60 |
 | Maximum calls | 10,000 |
-| Passes | 1 |
+  | Passes | 1 |
 | Prompt format / source context | `compact` / `usage` |
 | Prompt bytes / targets per request | 12,000 / 16 |
 | HTML report | Off; enable with `--report` |

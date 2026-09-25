@@ -47,6 +47,15 @@ test('static worker analyzes, calls mocked API, streams and renames without Node
   assert.equal(events.at(-1).result.inputTokens, 30);
 });
 
+test('browser linked propagation sends prior hints in the actual prompt',async()=>{
+ const {events,calls}=await runWorker('let a=1;let b=a+2;console.log(b);','success',{requestPropagation:'linked',maxTargets:1,rpm:6000});
+ assert.equal(calls,2);assert.equal(events.at(-1).result.status,'completed');
+ const requests=events.filter(e=>e.type==='request');
+ assert.equal(requests[1].request.previousNames[0].suggested,'meaningful0');
+ assert.match(requests[1].prompt,/previousNames/);
+ assert.ok(events.findIndex(e=>e.type==='response')<events.indexOf(requests[1]));
+});
+
 test('browser worker rejects oversized input before networking and preserves failed runs', async () => {
   const invalid = await runWorker('x'.repeat(MAX_SOURCE_BYTES + 1));
   assert.equal(invalid.calls, 0);
@@ -84,8 +93,8 @@ test('Pages assets work below a repository URL and contain no server transport',
 });
 
 test('web options enforce integer bounds and default concurrency to 16', () => {
-  assert.deepEqual(validateOptions(), {contextMode:'usage',promptFormat:'compact',passes:1,concurrency:16,rpm:60,maxCalls:1000,promptBytes:12000,maxTargets:16});
-  for (const options of [{passes:3},{passes:0},{passes:1.5},{passes:"2"},{concurrency:33},{rpm:0},{maxCalls:1.5},{promptBytes:1023},{maxTargets:65},{concurrency:'16'},null]) {
+  assert.deepEqual(validateOptions(), {requestPropagation:'off',contextMode:'usage',promptFormat:'compact',passes:1,concurrency:16,rpm:60,maxCalls:1000,promptBytes:12000,maxTargets:16});
+  for (const options of [{requestPropagation:'invalid'},{passes:3},{passes:0},{passes:1.5},{passes:"2"},{concurrency:33},{rpm:0},{maxCalls:1.5},{promptBytes:1023},{maxTargets:65},{concurrency:'16'},null]) {
     assert.throws(()=>validateOptions(options));
   }
 });

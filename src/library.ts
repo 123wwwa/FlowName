@@ -3,7 +3,8 @@ import {budgetedRequests} from './request-budget.js';
 import {rename} from './rename.js';
 import {acceptResponse,ModelFormatError} from './inference.js';
 import {promptFor} from './grouping.js';
-import {mapConcurrent,serialWriter} from './concurrency.js';
+import {mapConcurrent,mapDependent,serialWriter} from './concurrency.js';
+import {propagationPlan,withPreviousNames} from './propagation.js';
 import {priorityTargets,rebaseAnalysis} from './passes.js';
 import type {Provider,InferenceRequest,Analysis,PromptFormat,ContextMode} from './types.js';
 export interface RecoveryEvent {
@@ -14,11 +15,13 @@ export interface RecoveryEvent {
  unresolved?:Record<string,string>; ignoredIds?:string[]; applied?:Record<string,string>;
  inputTokens?:number|null; outputTokens?:number|null; result?:RecoveryResult;
 }
-export interface RecoveryOptions {provider:Provider;contextMode?:ContextMode;promptFormat?:PromptFormat;passes?:1|2;concurrency?:number;rpm?:number;maxCalls?:number;promptBytes?:number;maxTargets?:number;signal?:AbortSignal;onEvent?:(event:RecoveryEvent)=>void|Promise<void>;}
+export interface RecoveryOptions {provider:Provider;requestPropagation?:'off'|'linked';contextMode?:ContextMode;promptFormat?:PromptFormat;passes?:1|2;concurrency?:number;rpm?:number;maxCalls?:number;promptBytes?:number;maxTargets?:number;signal?:AbortSignal;onEvent?:(event:RecoveryEvent)=>void|Promise<void>;}
 export interface RecoveryResult {code:string;proposed:Record<string,string>;accepted:Record<string,string>;rejected:Record<string,string>;adjustments:Record<string,string>;status:'completed'|'partial'|'cancelled';calls:number;plannedCalls:number;failedCalls:number;inputTokens:number|null;outputTokens:number|null;warnings:string[];}
 /** Shared call/rate budgets across at most two passes and one repair per group. */
 export async function recoverNames(code:string,options:RecoveryOptions):Promise<RecoveryResult>{
  const {provider,signal}=options;
+ const requestPropagation=options.requestPropagation??'off';
+ if(requestPropagation!=='off'&&requestPropagation!=='linked')throw new Error('requestPropagation must be off or linked.');
  const contextMode=options.contextMode??'usage';
  if(!['declarations','usage'].includes(contextMode))throw new Error('contextMode must be declarations or usage.');
  const promptFormat=options.promptFormat??'compact';
@@ -71,8 +74,12 @@ export async function recoverNames(code:string,options:RecoveryOptions):Promise<
   let pendingInitial=requests.length;
   // Reserve the original pass-two estimate until its actual context is available.
   const futureReserved=initialPlans.slice(phase+1).reduce((n,p)=>n+p.length,0);
+  const groupOffset=groupCounter;
   const groups=requests.map(request=>({request,groupIndex:groupCounter++}));
-  await mapConcurrent(groups,concurrency,async({request:original,groupIndex})=>{
+  const candidates=requestPropagation==='linked'?propagationPlan(requests,currentAnalysis):requests.map(()=>[]);
+  const dependencies=candidates.map(list=>[...new Set(list.map(c=>c.owner))]);
+  const runGroup=async({request:base,groupIndex}:typeof groups[number],localIndex:number)=>{
+   const original=requestPropagation==='linked'?withPreviousNames(base,candidates[localIndex]!,passNames,promptBytes,groupOffset):base;
    let request:InferenceRequest=original;
    for(let attempt=1;attempt<=2;attempt++){
     await pace('');if(stop||signal?.aborted)return;
@@ -118,18 +125,21 @@ export async function recoverNames(code:string,options:RecoveryOptions):Promise<
     if(needsRepair&&attempt===1){
      const ids=new Set(missing);
      const candidate={...original,formatRepair:true,targets:original.targets.filter(t=>ids.has(t.id)),relations:original.relations.filter(r=>ids.has(r.from)&&ids.has(r.to))};
-     candidate.budgeting={...original.budgeting,promptBytes:Buffer.byteLength(promptFor(candidate)),outputReserveTokens:128+64*missing.length};
+     const repairBytes=Buffer.byteLength(promptFor(candidate));
+     const budgetedCandidate=Object.assign(candidate,{budgeting:{...base.budgeting,promptBytes:repairBytes,outputReserveTokens:128+64*missing.length}});
      if(stop||signal?.aborted)event.retrySkipped='Run stopped or cancelled.';
      else if(count+pendingInitial+futureReserved+repairReservations>=maxCalls)event.retrySkipped='No spare maxCalls budget after reserving initial requests.';
-     else if(candidate.budgeting.promptBytes>promptBytes)event.retrySkipped='Correction would exceed promptBytes.';
-     else {repair=candidate;repairReservations++;}
+     else if(repairBytes>promptBytes)event.retrySkipped='Correction would exceed promptBytes.';
+     else {repair=budgetedCandidate;repairReservations++;}
     }
     await emit({...event,groupIndex,attempt,pass});
     if(!repair||stop||signal?.aborted)return;
     // Concurrent repairs recheck the actual cap before starting, using the same pool.
     retries++;request=repair;
    }
-  },()=>stop||!!signal?.aborted);
+  };
+  if(requestPropagation==='linked')await mapDependent(groups,dependencies,concurrency,runGroup,()=>stop||!!signal?.aborted);
+  else await mapConcurrent(groups,concurrency,runGroup,()=>stop||!!signal?.aborted);
   const changed=rename(currentCode,currentAnalysis,passNames);
   currentCode=changed.code;
   Object.assign(accepted,changed.accepted);Object.assign(rejected,changed.rejected);Object.assign(adjustments,changed.adjustments);

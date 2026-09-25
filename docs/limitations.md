@@ -16,7 +16,7 @@ Parseable JSON answers are accepted **per target ID**. Valid identifier names ar
 
 Both passes and repairs share concurrency, RPM and `maxCalls`. The original plans are checked before networking; pass two is rebuilt after renaming. If its new context cannot fit the remaining budget, the run preserves pass-one output and reports a partial result. Logs distinguish pass, group, attempt, accepted response entries, ignored IDs and unresolved targets. Authentication, quota, network, HTTP-envelope and response-size errors are not automatically retried.
 
-**Propagation does not guarantee consistency.** Requests within a pass still use a fixed source snapshot, cross-group relation facts are omitted, and incorrect first-pass names can bias the second pass. Priority is a syntactic heuristic, not a confidence score; snippets may omit useful function-body evidence. There is no recursive refinement or runtime execution. See [partial acceptance and two-pass recovery](recovery-passes.md) for the exact policy and remaining limitations. Dynamic analysis is deferred.
+**Propagation does not guarantee consistency.** Requests within a pass still use a fixed source snapshot, cross-group relation facts are omitted (optional linked propagation supplies only bounded prior-name hints), and incorrect first-pass names can bias the second pass. Priority is a syntactic heuristic, not a confidence score; snippets may omit useful function-body evidence. There is no recursive refinement or runtime execution. See [partial acceptance and two-pass recovery](recovery-passes.md) for the exact policy and remaining limitations. Dynamic analysis is deferred.
 
 ## Declaration excerpts can omit decisive usage context
 
