@@ -52,7 +52,7 @@
     "package-dist",
     "README.md",
     "CHANGELOG.md",
-    "docs",
+    "docs/*.md",
     "LICENSE"
   ],
   "repository": {
