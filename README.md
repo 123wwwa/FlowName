@@ -14,6 +14,14 @@ Identifiers are resolved to lexical bindings, keeping identical spellings in dif
 
 **Experimental alpha.** Requires Node.js 22.8+. APIs may change; review recovered code before using it.
 
+## Prior work and evaluation scope
+
+The idea of using relationships to infer names together predates LLMs. [JSNice (2015)](https://www.sri.inf.ethz.ch/publications/raychev2015predicting) represents program properties for joint prediction with conditional random fields; its applications include JavaScript identifier names. [JSNaughty](https://www.cs.ucdavis.edu/~devanbu/jsnaughty.pdf) explored statistical machine translation for minified names, while [JSNeat](https://arxiv.org/abs/1906.03488) used usage contexts and relationships between variables to search a source-code corpus. FlowName applies this established joint-context intuition to **budgeted LLM requests** rather than claiming to introduce relational naming.
+
+For binary decompilation, [LmPa (2023, original version)](https://arxiv.org/pdf/2306.02546v1) combines program analysis with multiple LLM queries and propagates useful names into later queries. It sometimes passes names as comments instead of directly replacing identifiers, because an already meaningful-looking name can discourage further renaming. FlowName's optional linked requests likewise pass earlier suggestions as separate, unverified hints; its lightweight JavaScript analysis, grouping policy and cost goals differ from LmPa's iterative binary analysis.
+
+The broader [JsDeObsBench](https://jsdeobf.github.io/) has **not** been run for FlowName because a full LLM evaluation is outside this personal project's current budget. The preliminary internal measurements above support investigating lower request cost on the tested inputs; they do not establish an advantage on JsDeObsBench, general naming quality or a direct win over other tools. Testing the hypothesis across more programs remains future work.
+
 ## How FlowName compares with Humanify
 
 Both tools use static analysis to distinguish bindings and apply LLM-proposed names. FlowName also uses lightweight relations to decide which targets share a request and which evidence fits the prompt budget.
