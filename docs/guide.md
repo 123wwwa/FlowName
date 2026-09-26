@@ -5,6 +5,7 @@
 ## Contract and limits
 
 - `recoverNames(source, options)` returns code, proposed/accepted/rejected/adjusted mappings, status, calls, nullable token usage and analysis warnings.
+- In the 1.x line, the documented `flowname` and `flowname/html` imports, exported TypeScript types, CLI command and documented flags are the compatibility surface. Changes to these interfaces follow semantic versioning. Inferred names and the exact grouping plan are model- and input-dependent outputs, not compatibility guarantees. Two-pass recovery and linked request propagation remain opt-in experiments; their naming quality and efficiency are not established.
 - Custom providers implement `{ label, async infer(request) }`; see exported TypeScript types. Never embed a shared API key in browser bundles. The static playground accepts each visitor's own key for that session.
 - `onEvent` receives plan/request/response/pass-complete/complete events. Request contexts and parsed responses are observable. Observer failure rejects the run and stops new work; in-flight work drains.
 - AbortSignal/Ctrl+C stops scheduling and drains in-flight requests (provider timeout still applies). Model-content JSON/schema failures allow one corrective retry per group, subject to call and prompt budgets; other errors are not automatically retried.
@@ -14,9 +15,9 @@
 
 ## Development and packaging
 
-`npm test` runs offline regression tests. `npm pack` builds an installable alpha tarball with only the public entrypoints' dependency closure. It does not publish. Experiment scripts, old data/results and credentials are excluded from this product repository and package.
+`npm test` runs offline regression tests. `npm pack` builds an installable tarball with only the public entrypoints' dependency closure. It does not publish. Experiment scripts, old data/results and credentials are excluded from this product repository and package.
 
-FlowName uses the [MIT license](../LICENSE). Public npm name availability and npm publication remain release tasks. The playground supports GitHub Pages deployment; an official documentation site is a separate next step.
+FlowName uses the [MIT license](../LICENSE). npm package publication is separate from the GitHub Pages workflow; check the registry version and `latest` dist-tag after each release. The playground supports GitHub Pages deployment; an official documentation site is a separate next step.
 
 `npm run test:package` builds a fresh tarball, installs it into an isolated temporary project and checks imports, strict TypeScript declarations without ambient Node types, the installed CLI, HTML reports and license inclusion. It installs test dependencies but never calls a model or publishes. Package staging is cleaned before packing. CI runs this check on Node 22.8.0 and Node 24; Pages deployment waits for these checks as well as the existing library/browser tests.
 

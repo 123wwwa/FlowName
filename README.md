@@ -12,7 +12,7 @@ Identifiers are resolved to lexical bindings, keeping identical spellings in dif
 
 **Early evidence of lower token cost:** a historical compact run used **60.45% fewer total tokens** than the earlier one-identifier-per-request, 500-character-context baseline on the full Axios input (289,823 vs. 732,742 tokens; 1,800 target bindings). This compares separate runs with different implementations, grouping budgets and repair policies; it does not isolate the effect of prompt format or establish equivalent naming quality. Compact left 16 targets unresolved, versus 2 in the earlier baseline. Compact is the default, retaining relation-guided grouping, target IDs, declaration offsets, source excerpts and relation facts with less metadata. See the [measurements and limits](docs/experiments.md#current-compact-vs-historical-local-500).
 
-**Experimental alpha.** Requires Node.js 22.8+. APIs may change; review recovered code before using it.
+**Version 1.0.** Requires Node.js 22.8+. The default is a single, compact pass; two-pass recovery and linked name hints remain opt-in experiments. Review recovered code before using it as a replacement: naming quality and behavioral equivalence are not guaranteed. See the [supported contract and limitations](docs/guide.md#contract-and-limits) and [release notes](CHANGELOG.md).
 
 ## Prior work and evaluation scope
 
@@ -48,10 +48,10 @@ Prompt format defaults to **Compact**, preserving IDs, source and relation facts
 
 ## CLI
 
-Run the alpha CLI without a global installation:
+Run the published CLI without a global installation:
 
 ```sh
-npx --package=flowname@alpha flowname input.js
+npx --yes --package=flowname@latest flowname input.js
 ```
 
 Set `GEMINI_API_KEY` (or `FLOWNAME_API_KEY`) in your environment first; the CLI does not automatically load `.env`. No flags are required. Defaults are Gemini 3.5 Flash-Lite, concurrency 4, RPM 60, up to 10,000 calls, one pass, compact prompts and bounded use context. `FLOWNAME_MODEL` and `FLOWNAME_BASE_URL` can override the model and endpoint.
@@ -59,17 +59,17 @@ Set `GEMINI_API_KEY` (or `FLOWNAME_API_KEY`) in your environment first; the CLI 
 Each run creates a unique `flowname-output-TIMESTAMP-ID` folder in the current directory containing `output.js` and `result.json`. Add `--report` for a live HTML report and its browser link:
 
 ```sh
-npx --package=flowname@alpha flowname input.js --report
+npx --yes --package=flowname@latest flowname input.js --report
 ```
 
 Use flags only to override defaults, for example `--out ./my-output`, `--model MODEL` or `--max-calls 1000`. An explicitly selected output directory must be new. See `flowname --help` and the [CLI guide](docs/guide.md#cli-defaults-and-optional-live-report).
 
 ## Library
 
-Install the alpha explicitly:
+Install the published release:
 
 ```sh
-npm install flowname@alpha
+npm install flowname
 ```
 
 For a local checkout, `npm pack` produces an installable tarball.

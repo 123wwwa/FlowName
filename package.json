@@ -1,6 +1,6 @@
 {
   "name": "flowname",
-  "version": "0.1.0-alpha.1",
+  "version": "1.0.0",
   "type": "module",
   "description": "Analysis-guided joint JavaScript identifier recovery",
   "engines": {
@@ -51,6 +51,7 @@
   "files": [
     "package-dist",
     "README.md",
+    "CHANGELOG.md",
     "docs",
     "LICENSE"
   ],
