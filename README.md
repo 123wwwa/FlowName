@@ -10,6 +10,8 @@ In a direct benchmark against a leading symbol-based tool (Humanify) on a 411-bi
 * 💰 **36% Lower Token Cost** (87k vs 137k total tokens) by eliminating overlapping context bloat.
 * 🎯 **Higher Semantic Precision** (155 vs 37 win-rate in Original-aware evaluation) and 50% more exact original-name matches, proving that guaranteed AST context prevents LLM hallucinations.
 
+**[Explore all 411 name comparisons in the HTML report](https://123wwwa.github.io/FlowName/benchmarks/cigar-humanify-2026-09-27.html).** The 155 vs 37 comparison is an automated, uncalibrated Jev judgment, and this one-program run cannot establish a general naming-quality advantage. See the [benchmark notes](docs/benchmarks/cigar-humanify-2026-09-27.md) for the setup and limits.
+
 **Version 1.0.** Requires Node.js 22.8+. See the [supported contract and limitations](https://www.google.com/search?q=docs/guide.md%2523contract-and-limits&utm_source=gemini) and [release notes](CHANGELOG.md).
 
 ---

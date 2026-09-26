@@ -9,6 +9,7 @@
 - [Architecture](architecture.md): execution diagrams and module responsibilities.
 - [Limitations and response recovery](limitations.md): missing context, cross-request consistency and bounded repairs.
 - [Historical token measurements](experiments.md): compact vs. verbose, earlier prototype results and the retired Axios benchmark.
+- [FlowName vs. Humanify on Cigar](https://123wwwa.github.io/FlowName/benchmarks/cigar-humanify-2026-09-27.html): searchable per-binding name comparison and automated labels.
 - [Usage, contracts and deployment](guide.md): options, budgets, packaging and web hosting.
 - [Partial acceptance and recovery passes](recovery-passes.md): response validation and optional name propagation.
 - [Two-pass cost assessment](pass-cost-assessment.md): API-free planning measurements, not measured model tokens.
