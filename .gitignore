@@ -20,6 +20,7 @@
 !/docs/relation-walkthrough.md
 !/docs/jsimplifier-requests.md
 !/docs/edge-case-audit.md
+!/docs/humanify.md
 !/docs/benchmarks/
 /docs/benchmarks/*
 !/docs/benchmarks/cigar-humanify-2026-09-27.md

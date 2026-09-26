@@ -33,3 +33,15 @@ For example, `const d = b.user; const e = d.permissions; c(e);` connects `d` to 
 See the [worked example: source → bindings → relations → requests → applied names](relation-walkthrough.md), including exact IDs and grouping output verified with the current planner, and what changes when a group must be split.
 
 The goal is **useful names with less repeated context and fewer API calls**, rather than exact reconstruction of the author's original spelling. Each request and response is visible in the live HTML report or web playground, including proposed names, applied names and collision adjustments.
+
+## Where it fits
+
+Use FlowName at the identifier-naming stage of JavaScript recovery. For obfuscated code, first use a tool such as [webcrack](https://github.com/j4k0xb/webcrack) to remove supported obfuscation patterns. For bundled code, use [Wakaru](https://github.com/pionxzh/wakaru) or webcrack to extract supported bundles into modules. Then pass the resulting JavaScript files to FlowName to infer useful variable and function names.
+
+## Prior work and evaluation scope
+
+The idea of using relationships to infer names together predates LLMs. [JSNice (2015)](https://www.sri.inf.ethz.ch/publications/raychev2015predicting) represents program properties for joint prediction with conditional random fields; its applications include JavaScript identifier names. [JSNaughty](https://www.cs.ucdavis.edu/~devanbu/jsnaughty.pdf) explored statistical machine translation for minified names, while [JSNeat](https://arxiv.org/abs/1906.03488) used usage contexts and relationships between variables to search a source-code corpus. FlowName applies this established joint-context intuition to **budgeted LLM requests** rather than claiming to introduce relational naming.
+
+For binary decompilation, [LmPa (2023, original version)](https://arxiv.org/pdf/2306.02546v1) combines program analysis with multiple LLM queries and propagates useful names into later queries. FlowName's optional linked requests likewise pass earlier suggestions as separate, unverified hints; its lightweight JavaScript analysis, grouping policy and cost goals differ from LmPa's iterative binary analysis.
+
+See the [Humanify comparison](humanify.md) for a stage-by-stage architectural comparison and the [direct-run report](benchmarks/cigar-humanify-2026-09-27.md) for observed measurements and limits.

@@ -2,6 +2,35 @@
 
 [Back to README](../README.md)
 
+## Library quick start
+
+```js
+import { readFile } from 'node:fs/promises';
+import { recoverNames, createProvider } from 'flowname';
+import { createHtmlReporter } from 'flowname/html';
+
+const sourceCode = await readFile('./input.js', 'utf8');
+const reporter = await createHtmlReporter('./new-report-directory');
+const provider = createProvider({
+  provider: 'gemini', model: 'gemini-3.5-flash-lite',
+  apiKey: process.env.GEMINI_API_KEY,
+});
+const result = await recoverNames(sourceCode, {
+  provider, passes: 1, promptFormat: 'compact', concurrency: 4, rpm: 60,
+  maxCalls: 1000, promptBytes: 12000, maxTargets: 16,
+  onEvent: reporter.onEvent,
+});
+console.log(result.status, result.code);
+```
+
+The reporter requires a new directory with an existing parent. Open its `index.html` while recovery runs; it refreshes every two seconds. Reports contain source code, requests, responses and recovered output. The CLI's `--report` flag creates the same live report without a library integration.
+
+## Choosing prompt and recovery modes
+
+Prompt format defaults to **Compact**, preserving target IDs, source excerpts and relation facts with less metadata. Choose **Verbose** for the earlier full serialization. Recovery defaults to **Single pass**; **Two passes (experimental)** names priority functions and classes before remaining targets, and may increase cost.
+
+**Names between requests** defaults to **Independent**. **Linked names (experimental)** lets selected later groups see bounded, unverified suggestions from related earlier requests while unrelated groups remain parallel. It may increase tokens and latency. Choose it with CLI `--request-propagation linked` or library `requestPropagation: 'linked'`; see the [detailed propagation policy](#linked-request-propagation-experimental).
+
 ## Contract and limits
 
 - `recoverNames(source, options)` returns code, proposed/accepted/rejected/adjusted mappings, status, calls, nullable token usage and analysis warnings.

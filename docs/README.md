@@ -5,6 +5,7 @@
 [Project introduction and quick start](../README.md)
 
 - [Motivation and approach](approach.md): design goals, related tools and relation-guided requests.
+- [Humanify comparison](humanify.md): request construction, renaming safeguards and the direct-run evidence.
 - [Relation walkthrough](relation-walkthrough.md): source, bindings, graph, prompts and applied names in a worked example.
 - [Architecture](architecture.md): execution diagrams and module responsibilities.
 - [Limitations and response recovery](limitations.md): missing context, cross-request consistency and bounded repairs.
