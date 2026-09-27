@@ -52,13 +52,18 @@ export function budgetedRequests(code:string,analysis:Analysis,ids:string[],budg
   const covered=(span:{start:number;end:number})=>declarations.some(r=>r.start<=span.start&&r.end>=span.end);
   let accepted:Array<NonNullable<Analysis['usageContexts']>[string][number]>=[],included=0,omitted=0;
   const appendix=(uses:typeof accepted)=>{
+   // Keep branch guards and uses together. Separate fragments spend the use
+   // allowance on the first few bindings in a large scope.
+   const guarded=uses.filter(u=>u.guards.length>0);
+   const plain=uses.filter(u=>!guarded.includes(u));
+   const guardedUses=guarded.map(u=>`\n/* ${u.guards.map(g=>`${g.kind} ${code.slice(g.span.start,g.span.end)}`).join('; ')} */\n${code.slice(u.span.start,u.span.end)}\n`).join('');
    const guards=new Map<string,{kind:string;span:{start:number;end:number}}>();
-   for(const use of uses)for(const p of use.guards)guards.set(`${p.kind}:${p.span.start}:${p.span.end}`,p);
-   const ranges=uses.map(u=>({...u.span})).sort((a,b)=>a.start-b.start);
+   for(const use of plain)for(const p of use.guards)guards.set(`${p.kind}:${p.span.start}:${p.span.end}`,p);
+   const ranges=plain.map(u=>({...u.span})).sort((a,b)=>a.start-b.start);
    const merged:typeof ranges=[];for(const r of ranges){const last=merged.at(-1);if(last&&r.start<=last.end)last.end=Math.max(last.end,r.end);else merged.push(r);}
    const fragments=[...guards.values(),...merged.map(span=>({kind:'use excerpt',span}))].filter(p=>!covered(p.span));
-   const links=[...new Set(uses.filter(u=>u.guards.length).map(u=>`/* use [${u.span.start},${u.span.end}) under ${u.guards.map(g=>`${g.kind} [${g.span.start},${g.span.end})`).join('; ')} */`))];
-   return '\n'+links.join('\n')+fragments.map(p=>`\n/* ${p.kind} [${p.span.start},${p.span.end}); separate source fragment */\n${code.slice(p.span.start,p.span.end)}\n`).join('');
+   const links=[...new Set(plain.filter(u=>u.guards.length).map(u=>`/* use [${u.span.start},${u.span.end}) under ${u.guards.map(g=>`${g.kind} [${g.span.start},${g.span.end})`).join('; ')} */`))];
+   return guardedUses+(plain.length?'\n'+links.join('\n')+fragments.map(p=>`\n/* ${p.kind} [${p.span.start},${p.span.end}); separate source fragment */\n${code.slice(p.span.start,p.span.end)}\n`).join(''):'');
   };
   for(let round=0;round<2;round++)for(const target of request.targets){
    const use=analysis.usageContexts?.[target.id]?.[round];if(!use)continue;

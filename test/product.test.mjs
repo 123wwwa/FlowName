@@ -414,8 +414,32 @@ test('bounded use context preserves groups, budgets and lexical key evidence',as
   const base=budgetedRequests(source,analysis,ids,budget,16,format,'declarations'),uses=budgetedRequests(source,analysis,ids,budget,16,format,'usage');
   assert.deepEqual(uses.map(r=>r.targets.map(t=>t.id)),base.map(r=>r.targets.map(t=>t.id)));
   uses.forEach((r,i)=>{assert.deepEqual(r.relations,base[i].relations);assert.ok(Buffer.byteLength(promptFor(r))<=budget);assert.ok(r.budgeting.addedPromptBytes<=2048);});
-  if(budget===12000){const r=uses.find(r=>r.targets.some(t=>t.name==='a'));assert.match(r.context,/switch discriminant/);assert.match(r.context,/case label/);assert.match(r.context,/\n32\n/);assert.match(r.context,/!a/);assert.match(r.context,/fallthrough possible/);assert.doesNotMatch(r.context.slice(base[uses.indexOf(r)].context.length),/emit\(17\)/);}
+  if(budget===12000){const r=uses.find(r=>r.targets.some(t=>t.name==='a'));assert.match(r.context,/switch discriminant/);assert.match(r.context,/case label \(fallthrough possible\) 32/);assert.match(r.context,/!a/);assert.doesNotMatch(r.context.slice(base[uses.indexOf(r)].context.length),/emit\(17\)/);}
  }
+});
+
+test('large key-state groups retain case evidence for late targets',async()=>{
+ const {lightweight}=await import('../dist/lightweight.js');const {budgetedRequests}=await import('../dist/request-budget.js');
+ const names=Array.from({length:16},(_,i)=>`key${i}`),codes=[32,81,87,69,82,84,80,79,77,73,89,85,75,76,72,90];
+ const source=`let ${names.map(name=>`${name}=0`).join(',')};`+'/* gap */'.repeat(50)+`function onKey(event){switch(event.keyCode){${names.map((name,i)=>`case ${codes[i]}: if (!${name}) { send(${i}); ${name}=1; } break;`).join('')}}}`;
+ const analysis=lightweight(source),ids=analysis.symbols.filter(s=>names.includes(s.name)).map(s=>s.id);
+ const request=budgetedRequests(source,analysis,ids,12000,16,'compact','usage')[0];
+ assert.equal(request.targets.length,16);
+ assert.match(request.context,/case label \(fallthrough possible\) 90 \*\/\n!key15/);
+ assert.ok(request.budgeting.addedPromptBytes<=2048);
+ assert.ok(request.budgeting.promptBytes<=12000);
+});
+
+test('outer if conditions and write-only assignments reach bounded prompts',async()=>{
+ const {lightweight}=await import('../dist/lightweight.js');const {budgetedRequests}=await import('../dist/request-budget.js');
+ const source='let pressed=0,state=0;'+'/* gap */'.repeat(50)+'function onKey(event){if(event.keyCode===80){if(!pressed){pressed=1;}}}function update(flag){if(flag){state=42;}}console.log(state);';
+ const analysis=lightweight(source),ids=analysis.symbols.filter(s=>['pressed','state'].includes(s.name)).map(s=>s.id);
+ const request=budgetedRequests(source,analysis,ids,12000,16,'compact','usage')[0];
+ assert.match(request.context,/if test \(then branch\) event\.keyCode===80/);
+ assert.match(request.context,/!pressed/);
+ assert.match(request.context,/if test \(then branch\) flag/);
+ assert.match(request.context,/state=42/);
+ assert.ok(request.budgeting.addedPromptBytes<=2048);
 });
 
 test('use extraction respects function boundaries and bounded reference scanning',async()=>{
