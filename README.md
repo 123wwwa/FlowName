@@ -8,9 +8,9 @@
 
 In a direct benchmark against a leading symbol-based tool (Humanify) on a 411-binding obfuscated scope, FlowName delivered:
 
-* ⚡ **85% Faster Execution** (67.1s vs 456.2s) through relation-guided request batching (65 vs 411 API calls).
-* 💰 **36% Lower Token Cost** (87k vs 137k total tokens) by eliminating overlapping context bloat.
-* 🎯 **Higher Semantic Precision** (155 vs 37 win-rate in Original-aware evaluation) and 50% more exact original-name matches, proving that guaranteed AST context prevents LLM hallucinations.
+* ⚡ **85% Faster Execution** through relation-guided request batching .
+* 💰 **36% Lower Token Cost**  by eliminating overlapping context bloat.
+* 🎯 **Higher Semantic Precision** and 50% more exact original-name matches, proving that guaranteed AST context prevents LLM hallucinations.
 
 In a second comparison on GrobPaint's 1,786 anonymized bindings, FlowName used 408 vs 1,786 API calls and 29.36% fewer total tokens; original-source-aware Jev gave 512 vs 274 exclusive preferences.
 
