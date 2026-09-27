@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>FlowName benchmarks</title>
+  <style>
+    :root{color-scheme:dark;font:16px/1.6 system-ui,sans-serif;background:#0b1220;color:#e5e7eb}
+    body{max-width:1060px;margin:0 auto;padding:34px 24px 80px}a{color:#93c5fd}h1{font-size:2.3rem;line-height:1.2;margin:14px 0}h2{margin:42px 0 12px}p{max-width:780px;color:#bbc8da}.eyebrow{color:#9fc2f6;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:.8rem}.lead{font-size:1.15rem;color:#d9e6f5}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(245px,1fr));gap:14px;margin:28px 0}.card{background:#142239;border:1px solid #2d4261;border-radius:14px;padding:18px}.card strong{display:block;font-size:1.55rem;color:#fff}.card span{color:#a8bad1}.table-wrap{overflow:auto;border:1px solid #2d4261;border-radius:10px}table{border-collapse:collapse;width:100%;min-width:650px}th,td{text-align:left;padding:13px 14px;border-bottom:1px solid #2d4261}th{background:#15233a}.note{border-left:3px solid #93c5fd;padding:3px 16px;background:#142239}.links{display:flex;gap:14px;flex-wrap:wrap;margin-top:16px}.links a{display:inline-block;padding:8px 12px;border:1px solid #506889;border-radius:8px;text-decoration:none}.links a:hover,.links a:focus-visible{background:#203a56}small{color:#a8bad1}
+  </style>
+</head>
+<body>
+  <a href="../">← FlowName playground</a>
+  <div class="eyebrow">Measured case studies</div>
+  <h1>FlowName vs Humanify</h1>
+  <p class="lead">On two identifier-anonymized JavaScript inputs, FlowName used fewer API calls and total tokens. An automated, original-source-aware judge preferred more FlowName names in both runs. These are individual case studies, not a general benchmark guarantee.</p>
+
+  <div class="cards">
+    <div class="card"><strong>84.18% / 77.16%</strong><span>fewer API calls · Cigar / GrobPaint</span></div>
+    <div class="card"><strong>36.57% / 29.36%</strong><span>fewer total tokens · Cigar / GrobPaint</span></div>
+    <div class="card"><strong>155:37 / 512:274</strong><span>exclusive Jev preferences · FlowName:Humanify</span></div>
+  </div>
+
+  <h2>Results at a glance</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Input</th><th>Bindings</th><th>API calls<br><small>FlowName / Humanify</small></th><th>Total tokens<br><small>FlowName / Humanify</small></th><th>Jev exclusive preferences<br><small>FlowName / Humanify</small></th></tr></thead>
+    <tbody>
+      <tr><td><a href="cigar-humanify-2026-09-27.html">Cigar</a></td><td>411</td><td>65 / 411</td><td>87,107 / 137,332</td><td>155 / 37</td></tr>
+      <tr><td><a href="grobpaint-humanify-2026-09-27.html">GrobPaint</a></td><td>1,786</td><td>408 / 1,786</td><td>386,416 / 547,006</td><td>512 / 274</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>What was compared</h2>
+  <p>Each input was anonymized by replacing eligible lexical binding names. Both naming tools received the same anonymized input and used <code>gemini-3.5-flash-lite</code>. Cigar contains 1,756 code lines and 411 targets. GrobPaint contains 5,860 code lines and 1,786 targets, built from the application's five JavaScript modules; the external JSZip dependency was excluded. The GrobPaint source comes from <a href="https://github.com/groverburger/grobpaint/tree/ece22c32647933137d5be426eeecd5641a279e67">this MIT-licensed revision</a>. The GrobPaint FlowName run used a local build with post-1.0.0 context changes.</p>
+  <p>Jev 1.13 separately judged whether each applied name was useful and compared the pair when both were useful. It received the original author name and bounded original-code excerpts; the naming tools did not receive the author names. Candidate order varied by binding and tool identities were hidden from Jev. Its scores are uncalibrated model outputs, not probabilities that a name is correct.</p>
+
+  <div class="note"><p><strong>Read the quality result with care.</strong> Humanify's naming prompt did not contain the target spelling for 200 Cigar bindings and 154 GrobPaint bindings. Among targets present in its prompt, exclusive Jev preferences were 38:37 on Cigar and 384:274 on GrobPaint. The Cigar comparison therefore does not isolate the effect of FlowName's grouping. Jev also evaluated final applied names: collision-safe suffixes such as <code>Layer2</code> can lower a score even when the original model proposal was <code>Layer</code>.</p></div>
+  <p>These are one run per tool per input, with different request strategies. Automated labels need human review, especially near decision boundaries. No runtime behavior-equivalence test was performed on the renamed outputs. The published detail pages show bounded excerpts from the anonymized input; raw provider requests and original named sources are kept in local audit files.</p>
+
+  <div class="links"><a href="cigar-humanify-2026-09-27.html">Inspect all Cigar names</a><a href="grobpaint-humanify-2026-09-27.html">Inspect all GrobPaint names</a><a href="https://github.com/123wwwa/FlowName/blob/main/docs/benchmarks/cigar-humanify-2026-09-27.md">Cigar methods and limitations</a></div>
+</body>
+</html>

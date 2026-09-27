@@ -1,6 +1,6 @@
 # FlowName vs. Humanify on one Cigar input
 
-This is a **single direct run per tool on one identifier-anonymized JavaScript program**, followed by automated name review. The input had 411 lexical bindings and 1,757 physical lines (1,756 code lines); anonymized-input SHA-256: `9bdba857afadb315a6423fdb7a97b8ae6e95ab951de2c4c05ff5c80e5e90380f`. The original named source and request/response logs are retained locally and are not published here. The [searchable HTML report](cigar-humanify-2026-09-27.html) contains names, derived labels and bounded code excerpts from the **anonymized pre-rename input**. Hover or focus a row to inspect its declaration and a sample reference; click to pin the preview. These excerpts are for human inspection and are not necessarily the exact context either tool sent to its model.
+This is a **single direct run per tool on one identifier-anonymized JavaScript program**, followed by automated name review. The input had 411 lexical bindings and 1,757 physical lines (1,756 code lines); anonymized-input SHA-256: `9bdba857afadb315a6423fdb7a97b8ae6e95ab951de2c4c05ff5c80e5e90380f`. The original named source and request/response logs are retained locally and are not published here. The [searchable HTML report](cigar-humanify-2026-09-27.html) contains names, derived labels and bounded code excerpts from the **anonymized pre-rename input**. Hover or focus the ID or author-name cell to inspect its declaration and a sample reference; click to pin the preview. These excerpts are for human inspection and are not necessarily the exact context either tool sent to its model.
 
 Both tools used `gemini-3.5-flash-lite` through the same Gemini account. Humanify 3.1.1 used its default ladder JSON strategy, 500-character context and serial walker. FlowName 1.0.0 used its default single pass, compact prompts and bounded use excerpts, with concurrency 16. Request starts were limited to 60 per minute for both. The original author names were withheld from both naming tools.
 
@@ -30,7 +30,7 @@ The current, provisional label policy treats both candidates as useful when each
 | Both poor | 129 |
 | Unsure | 0 |
 
-Jev flagged 140 judgments for review. The [HTML report](cigar-humanify-2026-09-27.html) shows current and originally recorded labels, both usefulness scores and review notes. It also records whether Humanify's naming prompt contained the anonymized target spelling:
+Jev flagged 140 judgments for review. The [HTML report](cigar-humanify-2026-09-27.html) shows current labels, both usefulness scores and review notes. It also records whether Humanify's naming prompt contained the anonymized target spelling:
 
 | Target in Humanify prompt | Bindings | FlowName better | Humanify better | Both useful | Both poor |
 | --- | ---: | ---: | ---: | ---: | ---: |

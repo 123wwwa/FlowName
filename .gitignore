@@ -25,6 +25,8 @@
 /docs/benchmarks/*
 !/docs/benchmarks/cigar-humanify-2026-09-27.md
 !/docs/benchmarks/cigar-humanify-2026-09-27.html
+!/docs/benchmarks/grobpaint-humanify-2026-09-27.html
+!/docs/benchmarks/index.html
 !/src/
 /src/*
 !/src/analysis.ts
