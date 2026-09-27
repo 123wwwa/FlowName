@@ -12,7 +12,9 @@ In a direct benchmark against a leading symbol-based tool (Humanify) on a 411-bi
 * 💰 **36% Lower Token Cost** (87k vs 137k total tokens) by eliminating overlapping context bloat.
 * 🎯 **Higher Semantic Precision** (155 vs 37 win-rate in Original-aware evaluation) and 50% more exact original-name matches, proving that guaranteed AST context prevents LLM hallucinations.
 
-**[Explore all 411 name comparisons in the HTML report](https://123wwwa.github.io/FlowName/benchmarks/cigar-humanify-2026-09-27.html).** The 155 vs 37 comparison is an automated, uncalibrated Jev judgment; this one-program run cannot establish a general naming-quality advantage. See the [benchmark notes](docs/benchmarks/cigar-humanify-2026-09-27.md).
+In a second comparison on GrobPaint's 1,786 anonymized bindings, FlowName used 408 vs 1,786 API calls and 29.36% fewer total tokens; original-source-aware Jev gave 512 vs 274 exclusive preferences.
+
+**[Explore the benchmark summary and both searchable name reports](https://123wwwa.github.io/FlowName/benchmarks/).** Jev's judgments are automated and uncalibrated. Humanify's prompt omitted the target spelling for some bindings, and collision-safe suffixes can affect applied-name scores. See the summary for the context split and limitations.
 
 ## Run it
 
