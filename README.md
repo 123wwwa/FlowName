@@ -1,5 +1,7 @@
 # FlowName
 
+![FlowName wordmark with connected identifiers becoming meaningful names](docs/assets/flowname-banner.svg)
+
 ![FlowName versus Humanify on API calls, total tokens and variable-name quality in two measured comparisons](docs/assets/benchmark-comparison.svg)
 
 *Name quality shows the ratio of names exclusively preferred by an automated, uncalibrated Jev evaluation. [See the exact counts, method and limitations →](https://123wwwa.github.io/FlowName/benchmarks/)*
@@ -9,8 +11,6 @@
 **CLI:** `npx --yes --package=flowname@latest flowname input.js` (set `GEMINI_API_KEY` first).
 
 **FlowName** is a next-generation Semantic Identifier Recoverer for obfuscated JavaScript. By using AST-based static analysis to group logically related variables into budgeted LLM requests, FlowName eliminates the context-loss hallucinations common in naive text-window approaches.
-
-![FlowName pipeline from lexical bindings and lightweight relations to joint LLM naming and safe AST rename](docs/assets/how-it-works.svg)
 
 Across two direct benchmarks against a leading symbol-based tool (Humanify) on Cigar and GrobPaint, FlowName delivered these average relative results:
 

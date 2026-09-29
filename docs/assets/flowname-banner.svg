@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-labelledby="title desc">
+  <title id="title">FlowName</title>
+  <desc id="desc">FlowName wordmark beside connected code identifiers. Short, anonymous names flow through a shared relation graph and emerge as useful names.</desc>
+  <defs>
+    <linearGradient id="paper" x2="1" y2="1">
+      <stop offset="0" stop-color="#faf9f5"/>
+      <stop offset="1" stop-color="#eeefe9"/>
+    </linearGradient>
+    <linearGradient id="mint" x2="1" y2="1">
+      <stop offset="0" stop-color="#21b7a4"/>
+      <stop offset="1" stop-color="#087e79"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-30%" width="140%" height="170%">
+      <feDropShadow dx="0" dy="7" stdDeviation="9" flood-color="#183331" flood-opacity=".13"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="360" rx="24" fill="url(#paper)"/>
+  <path d="M48 34 H1152 M48 325 H1152" fill="none" stroke="#d9ded9" stroke-width="1"/>
+
+  <text x="51" y="222" fill="#142522" font-family="Georgia,Times New Roman,serif" font-size="103" font-weight="700" letter-spacing="-5">FlowName</text>
+  <text x="55" y="270" fill="#46635e" font-family="Segoe UI,Arial,sans-serif" font-size="25" font-weight="500">Recover meaning. Name together.</text>
+
+  <g fill="none" stroke="#9eaca8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M688 95 C738 95 739 173 797 173"/>
+    <path d="M688 180 H797"/>
+    <path d="M688 265 C738 265 739 187 797 187"/>
+  </g>
+  <g fill="none" stroke="#129c92" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M829 180 C878 180 879 95 918 95"/>
+    <path d="M829 180 H918"/>
+    <path d="M829 180 C878 180 879 265 918 265"/>
+  </g>
+
+  <g filter="url(#shadow)" font-family="Consolas,Menlo,monospace" font-weight="700" text-anchor="middle">
+    <rect x="624" y="66" width="64" height="58" rx="12" fill="#fff" stroke="#cdd7d3"/>
+    <rect x="624" y="151" width="64" height="58" rx="12" fill="#fff" stroke="#cdd7d3"/>
+    <rect x="624" y="236" width="64" height="58" rx="12" fill="#fff" stroke="#cdd7d3"/>
+    <text x="656" y="105" fill="#566b67" font-size="28">a</text>
+    <text x="656" y="190" fill="#566b67" font-size="28">b</text>
+    <text x="656" y="275" fill="#566b67" font-size="28">c</text>
+
+    <circle cx="813" cy="180" r="38" fill="url(#mint)"/>
+    <circle cx="813" cy="180" r="16" fill="none" stroke="#fff" stroke-width="3"/>
+    <circle cx="813" cy="160" r="4" fill="#fff"/>
+    <circle cx="797" cy="188" r="4" fill="#fff"/>
+    <circle cx="829" cy="188" r="4" fill="#fff"/>
+    <path d="M813 164 L797 185 M813 164 L829 185" fill="none" stroke="#fff" stroke-width="2"/>
+
+    <rect x="918" y="66" width="220" height="58" rx="12" fill="#fff" stroke="#9bc8bc"/>
+    <rect x="918" y="151" width="220" height="58" rx="12" fill="#fff" stroke="#9bc8bc"/>
+    <rect x="918" y="236" width="220" height="58" rx="12" fill="#fff" stroke="#9bc8bc"/>
+    <text x="1028" y="104" fill="#087e79" font-size="21">response</text>
+    <text x="1028" y="189" fill="#087e79" font-size="21">user</text>
+    <text x="1028" y="274" fill="#087e79" font-size="21">permissions</text>
+  </g>
+</svg>
