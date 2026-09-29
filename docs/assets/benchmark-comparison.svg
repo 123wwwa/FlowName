@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="440" viewBox="0 0 1200 440" role="img" aria-labelledby="title desc">
+  <title id="title">FlowName versus Humanify</title>
+  <desc id="desc">Two measured comparisons. Cigar: 84 percent fewer API calls, 36.6 percent fewer total tokens, and 4.2 times as many names exclusively preferred by automated Jev. GrobPaint: 77 percent fewer API calls, 29.4 percent fewer total tokens, and 1.9 times as many names exclusively preferred by Jev. These are single runs, and the automated quality judgments are uncalibrated. See the linked benchmark report for exact counts and limitations.</desc>
+  <defs>
+    <linearGradient id="background" x2="1" y2="1">
+      <stop offset="0" stop-color="#091324"/>
+      <stop offset="1" stop-color="#102843"/>
+    </linearGradient>
+    <linearGradient id="accent" x2="1" y2="0">
+      <stop offset="0" stop-color="#31d0bd"/>
+      <stop offset="1" stop-color="#75e2c5"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="440" rx="24" fill="url(#background)"/>
+  <rect x="1" y="1" width="1198" height="438" rx="23" fill="none" stroke="#31506c" stroke-width="2"/>
+  <text x="48" y="73" fill="#f5f9ff" font-family="Segoe UI,Arial,sans-serif" font-size="45" font-weight="700">FlowName vs Humanify</text>
+
+  <rect x="42" y="111" width="546" height="282" rx="20" fill="#15263c" stroke="#34506e"/>
+  <text x="68" y="158" fill="#f5f9ff" font-family="Segoe UI,Arial,sans-serif" font-size="30" font-weight="700">Cigar</text>
+  <text x="68" y="246" fill="url(#accent)" font-family="Segoe UI,Arial,sans-serif" font-size="62" font-weight="750">84%</text>
+  <text x="68" y="281" fill="#cbd8e7" font-family="Segoe UI,Arial,sans-serif" font-size="19">fewer calls</text>
+  <text x="259" y="246" fill="url(#accent)" font-family="Segoe UI,Arial,sans-serif" font-size="62" font-weight="750">36.6%</text>
+  <text x="259" y="281" fill="#cbd8e7" font-family="Segoe UI,Arial,sans-serif" font-size="19">fewer tokens</text>
+  <rect x="68" y="321" width="495" height="1" fill="#34506e"/>
+  <text x="68" y="363" fill="#f5f9ff" font-family="Segoe UI,Arial,sans-serif" font-size="35" font-weight="700">4.2×</text>
+  <text x="186" y="362" fill="#cbd8e7" font-family="Segoe UI,Arial,sans-serif" font-size="21">variable-name quality*</text>
+
+  <rect x="612" y="111" width="546" height="282" rx="20" fill="#15263c" stroke="#34506e"/>
+  <text x="638" y="158" fill="#f5f9ff" font-family="Segoe UI,Arial,sans-serif" font-size="30" font-weight="700">GrobPaint</text>
+  <text x="638" y="246" fill="url(#accent)" font-family="Segoe UI,Arial,sans-serif" font-size="62" font-weight="750">77%</text>
+  <text x="638" y="281" fill="#cbd8e7" font-family="Segoe UI,Arial,sans-serif" font-size="19">fewer calls</text>
+  <text x="829" y="246" fill="url(#accent)" font-family="Segoe UI,Arial,sans-serif" font-size="62" font-weight="750">29.4%</text>
+  <text x="829" y="281" fill="#cbd8e7" font-family="Segoe UI,Arial,sans-serif" font-size="19">fewer tokens</text>
+  <rect x="638" y="321" width="495" height="1" fill="#34506e"/>
+  <text x="638" y="363" fill="#f5f9ff" font-family="Segoe UI,Arial,sans-serif" font-size="35" font-weight="700">1.9×</text>
+  <text x="756" y="362" fill="#cbd8e7" font-family="Segoe UI,Arial,sans-serif" font-size="21">variable-name quality*</text>
+</svg>

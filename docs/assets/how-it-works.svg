@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="490" viewBox="0 0 1200 490" role="img" aria-labelledby="title desc">
+  <title id="title">How FlowName recovers JavaScript identifier names</title>
+  <desc id="desc">FlowName parses JavaScript into lexical bindings, extracts lightweight assignment, property, call and return relations, groups identifiers within request limits, sends target IDs and bounded source excerpts to an LLM, validates the returned names and applies collision-safe AST renames. An illustrative example renames a and b to user and permissions.</desc>
+  <defs>
+    <linearGradient id="background" x2="1" y2="1">
+      <stop offset="0" stop-color="#0a1527"/>
+      <stop offset="1" stop-color="#102943"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M1 1 L9 5 L1 9 Z" fill="#62d9c2"/>
+    </marker>
+  </defs>
+  <rect width="1200" height="490" rx="24" fill="url(#background)"/>
+  <rect x="1" y="1" width="1198" height="488" rx="23" fill="none" stroke="#31506c" stroke-width="2"/>
+  <text x="44" y="60" fill="#f5f9ff" font-family="Segoe UI,Arial,sans-serif" font-size="35" font-weight="700">How FlowName works</text>
+  <text x="45" y="91" fill="#abc2d9" font-family="Segoe UI,Arial,sans-serif" font-size="16">Lightweight program evidence → bounded joint naming → safe code rewrite</text>
+
+  <path d="M216 224 H230 M404 224 H418 M592 224 H606 M780 224 H794 M968 224 H982" fill="none" stroke="#62d9c2" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <rect x="44" y="125" width="172" height="202" rx="16" fill="#172a42" stroke="#345877"/>
+  <rect x="44" y="125" width="172" height="5" rx="2" fill="#6b9df4"/>
+  <text x="61" y="159" fill="#80afff" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="700">01 · INPUT</text>
+  <text x="61" y="194" fill="#f5f9ff" font-family="Segoe UI,Arial,sans-serif" font-size="21" font-weight="700">JavaScript</text>
+  <text x="61" y="220" fill="#f5f9ff" font-family="Segoe UI,Arial,sans-serif" font-size="21" font-weight="700">source</text>
+  <text x="61" y="266" fill="#afc3d8" font-family="Segoe UI,Arial,sans-serif" font-size="15">Minified or</text>
+  <text x="61" y="287" fill="#afc3d8" font-family="Segoe UI,Arial,sans-serif" font-size="15">preprocessed code</text>
+
+  <rect x="232" y="125" width="172" height="202" rx="16" fill="#172a42" stroke="#345877"/>
+  <rect x="232" y="125" width="172" height="5" rx="2" fill="#6b9df4"/>
+  <text x="249" y="159" fill="#80afff" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="700">02 · ANALYZE</text>
+  <text x="249" y="194" fill="#f5f9ff" font-family="Segoe UI,Arial,sans-serif" font-size="21" font-weight="700">Lexical</text>
+  <text x="249" y="220" fill="#f5f9ff" font-family="Segoe UI,Arial,sans-serif" font-size="21" font-weight="700">bindings</text>
+  <text x="249" y="266" fill="#afc3d8" font-family="Segoe UI,Arial,sans-serif" font-size="15">Each declaration</text>
+  <text x="249" y="287" fill="#afc3d8" font-family="Segoe UI,Arial,sans-serif" font-size="15">gets its own ID</text>
+
+  <rect x="420" y="125" width="172" height="202" rx="16" fill="#172a42" stroke="#345877"/>
+  <rect x="420" y="125" width="172" height="5" rx="2" fill="#6b9df4"/>
+  <text x="437" y="159" fill="#80afff" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="700">03 · CONNECT</text>
+  <text x="437" y="194" fill="#f5f9ff" font-family="Segoe UI,Arial,sans-serif" font-size="21" font-weight="700">Relation</text>
+  <text x="437" y="220" fill="#f5f9ff" font-family="Segoe UI,Arial,sans-serif" font-size="21" font-weight="700">facts</text>
+  <text x="437" y="263" fill="#afc3d8" font-family="Segoe UI,Arial,sans-serif" font-size="14">Assignments · calls</text>
+  <text x="437" y="284" fill="#afc3d8" font-family="Segoe UI,Arial,sans-serif" font-size="14">properties · returns</text>
+
+  <rect x="608" y="125" width="172" height="202" rx="16" fill="#172a42" stroke="#345877"/>
+  <rect x="608" y="125" width="172" height="5" rx="2" fill="#55d7bb"/>
+  <text x="625" y="159" fill="#75e9cb" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="700">04 · PLAN</text>
+  <text x="625" y="194" fill="#f5f9ff" font-family="Segoe UI,Arial,sans-serif" font-size="21" font-weight="700">Budgeted</text>
+  <text x="625" y="220" fill="#f5f9ff" font-family="Segoe UI,Arial,sans-serif" font-size="21" font-weight="700">groups</text>
+  <text x="625" y="263" fill="#afc3d8" font-family="Segoe UI,Arial,sans-serif" font-size="14">Relations first;</text>
+  <text x="625" y="284" fill="#afc3d8" font-family="Segoe UI,Arial,sans-serif" font-size="14">scope fallback</text>
+  <text x="625" y="305" fill="#afc3d8" font-family="Segoe UI,Arial,sans-serif" font-size="14">byte / target caps</text>
+
+  <rect x="796" y="125" width="172" height="202" rx="16" fill="#172a42" stroke="#345877"/>
+  <rect x="796" y="125" width="172" height="5" rx="2" fill="#55d7bb"/>
+  <text x="813" y="159" fill="#75e9cb" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="700">05 · INFER</text>
+  <text x="813" y="194" fill="#f5f9ff" font-family="Segoe UI,Arial,sans-serif" font-size="21" font-weight="700">Joint LLM</text>
+  <text x="813" y="220" fill="#f5f9ff" font-family="Segoe UI,Arial,sans-serif" font-size="21" font-weight="700">request</text>
+  <text x="813" y="263" fill="#afc3d8" font-family="Segoe UI,Arial,sans-serif" font-size="14">IDs + declarations</text>
+  <text x="813" y="284" fill="#afc3d8" font-family="Segoe UI,Arial,sans-serif" font-size="14">relation facts</text>
+  <text x="813" y="305" fill="#afc3d8" font-family="Segoe UI,Arial,sans-serif" font-size="14">+ bounded uses</text>
+
+  <rect x="984" y="125" width="172" height="202" rx="16" fill="#172a42" stroke="#345877"/>
+  <rect x="984" y="125" width="172" height="5" rx="2" fill="#55d7bb"/>
+  <text x="1001" y="159" fill="#75e9cb" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="700">06 · APPLY</text>
+  <text x="1001" y="194" fill="#f5f9ff" font-family="Segoe UI,Arial,sans-serif" font-size="21" font-weight="700">Safe AST</text>
+  <text x="1001" y="220" fill="#f5f9ff" font-family="Segoe UI,Arial,sans-serif" font-size="21" font-weight="700">rename</text>
+  <text x="1001" y="263" fill="#afc3d8" font-family="Segoe UI,Arial,sans-serif" font-size="14">Validate IDs;</text>
+  <text x="1001" y="284" fill="#afc3d8" font-family="Segoe UI,Arial,sans-serif" font-size="14">avoid collisions</text>
+  <text x="1001" y="305" fill="#afc3d8" font-family="Segoe UI,Arial,sans-serif" font-size="14">and name capture</text>
+
+  <rect x="44" y="353" width="1112" height="104" rx="14" fill="#0e2034" stroke="#31506c"/>
+  <text x="62" y="377" fill="#99b8d7" font-family="Segoe UI,Arial,sans-serif" font-size="13" font-weight="700">ILLUSTRATIVE EXAMPLE</text>
+  <text x="62" y="402" fill="#dce9f5" font-family="Consolas,Menlo,monospace" font-size="16">const a = response.user;</text>
+  <text x="62" y="427" fill="#dce9f5" font-family="Consolas,Menlo,monospace" font-size="16">const b = a.permissions;</text>
+  <path d="M365 407 H505" stroke="#62d9c2" stroke-width="3" marker-end="url(#arrow)"/>
+  <text x="377" y="396" fill="#75e9cb" font-family="Segoe UI,Arial,sans-serif" font-size="13">one group</text>
+  <text x="535" y="402" fill="#bdf6e5" font-family="Consolas,Menlo,monospace" font-size="16">const user = response.user;</text>
+  <text x="535" y="427" fill="#bdf6e5" font-family="Consolas,Menlo,monospace" font-size="16">const permissions = user.permissions;</text>
+  <text x="44" y="481" fill="#a8bdd1" font-family="Segoe UI,Arial,sans-serif" font-size="13">Lightweight syntactic relations guide requests; FlowName does not perform complete JavaScript data-flow analysis.</text>
+</svg>

@@ -21,6 +21,10 @@
 !/docs/jsimplifier-requests.md
 !/docs/edge-case-audit.md
 !/docs/humanify.md
+!/docs/assets/
+/docs/assets/*
+!/docs/assets/benchmark-comparison.svg
+!/docs/assets/how-it-works.svg
 !/docs/benchmarks/
 /docs/benchmarks/*
 !/docs/benchmarks/cigar-humanify-2026-09-27.md
