@@ -19,8 +19,11 @@ try {
   const [pack]=JSON.parse(json.startsWith('[')?json:json.slice(json.lastIndexOf('\n[')+1));
   assert.ok(pack.files.some(file=>file.path==='LICENSE'),'MIT license must be included.');
   assert.ok(pack.files.some(file=>file.path==='CHANGELOG.md'),'Release notes must be included.');
+  for(const asset of ['docs/assets/benchmark-comparison.svg','docs/assets/flowname-banner.svg']){
+    assert.ok(pack.files.some(file=>file.path===asset),`README image must be included: ${asset}`);
+  }
   for(const file of pack.files){
-    assert.ok(/^(package-dist\/[^/]+\.(js|d\.ts)|docs\/[^/]+\.md|README\.md|CHANGELOG\.md|LICENSE(?:\.md)?|package\.json)$/.test(file.path),`Unexpected package file: ${file.path}`);
+    assert.ok(/^(package-dist\/[^/]+\.(js|d\.ts)|docs\/[^/]+\.md|docs\/assets\/(?:benchmark-comparison|flowname-banner)\.svg|README\.md|CHANGELOG\.md|LICENSE(?:\.md)?|package\.json)$/.test(file.path),`Unexpected package file: ${file.path}`);
   }
   const typescript=JSON.parse(await readFile(join(root,'node_modules/typescript/package.json'),'utf8')).version;
   await writeFile(join(consumer,'package.json'),JSON.stringify({name:'flowname-package-check',private:true,type:'module'}));

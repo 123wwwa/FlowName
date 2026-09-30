@@ -64,6 +64,7 @@
 !/web/
 /web/*
 !/web/index.html
+!/web/benchmark-comparison.html
 !/web/app.js
 !/web/style.css
 !/web/server.mjs

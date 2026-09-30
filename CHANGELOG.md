@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.1
+
+- Add the FlowName banner and concise Humanify comparison to the README.
+- Include README SVG assets in the npm package so the images render on npm.
+
 ## 1.0.0
 
 FlowName's first non-prerelease version packages JavaScript identifier recovery as a Node library and CLI, with an install-free browser playground and optional live HTML report.

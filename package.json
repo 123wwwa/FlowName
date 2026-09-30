@@ -1,6 +1,6 @@
 {
   "name": "flowname",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "description": "Analysis-guided joint JavaScript identifier recovery",
   "engines": {
@@ -46,13 +46,14 @@
     }
   },
   "bin": {
-    "flowname": "./package-dist/product-cli.js"
+    "flowname": "package-dist/product-cli.js"
   },
   "files": [
     "package-dist",
     "README.md",
     "CHANGELOG.md",
     "docs/*.md",
+    "docs/assets/*.svg",
     "LICENSE"
   ],
   "repository": {

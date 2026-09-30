@@ -19,5 +19,8 @@ await mkdir(`${outdir}/benchmarks`, {recursive: true});
 await copyFile('docs/benchmarks/cigar-humanify-2026-09-27.html', `${outdir}/benchmarks/cigar-humanify-2026-09-27.html`);
 await copyFile('docs/benchmarks/grobpaint-humanify-2026-09-27.html', `${outdir}/benchmarks/grobpaint-humanify-2026-09-27.html`);
 await copyFile('docs/benchmarks/index.html', `${outdir}/benchmarks/index.html`);
+const comparisonTemplate = await readFile('web/benchmark-comparison.html', 'utf8');
+const comparisonSvg = await readFile('docs/assets/benchmark-comparison.svg', 'utf8');
+await writeFile(`${outdir}/benchmarks/comparison.html`, comparisonTemplate.replace('{{BENCHMARK_SVG}}', comparisonSvg));
 await writeFile(`${outdir}/.nojekyll`, '');
 console.log('Built static playground in pages-dist. No API keys are required at build time.');

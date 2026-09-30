@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FlowName vs Humanify</title>
+  <style>
+    :root { color-scheme: light; font-family: 'Segoe UI', Arial, sans-serif; color: #142522; background: #fff; }
+    body { margin: 0; padding: 24px; }
+    main { max-width: 1200px; margin: auto; }
+    svg { display: block; width: 100%; height: auto; }
+    .animated .bar { transform-box: fill-box; transform-origin: left center; animation: grow 1100ms cubic-bezier(.2,.8,.2,1) both; animation-delay: var(--delay); }
+    @keyframes grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+    footer { padding: 0 4% 24px; line-height: 1.6; color: #46635e; }
+    nav { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
+    a { color: #087e79; }
+    button { font: inherit; color: #087e79; background: #f6f8f7; border: 1px solid #9bc8bc; border-radius: 10px; padding: 10px 18px; cursor: pointer; }
+    button:hover { background: #e8f4ef; }
+    button:focus-visible, a:focus-visible { outline: 3px solid #087e79; outline-offset: 4px; }
+    @media (prefers-reduced-motion: reduce) { .animated .bar { animation: none; } }
+    @media (max-width: 600px) { body { padding: 8px; } footer { font-size: 14px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <div id="chart" class="animated">{{BENCHMARK_SVG}}</div>
+    <footer>
+      <p>*Name quality compares counts of names exclusively preferred by the automated, uncalibrated Jev judge. It is not a ratio of naming accuracy. Each input was tested once per tool; Humanify context omissions affect the comparison.</p>
+      <nav><button id="replay" type="button">Replay animation</button><a href="./">Exact counts, evaluation method and limitations →</a><a href="../">Try FlowName →</a></nav>
+    </footer>
+  </main>
+  <script>
+    const chart = document.getElementById('chart');
+    document.getElementById('replay').addEventListener('click', () => {
+      chart.classList.remove('animated');
+      void chart.offsetWidth;
+      chart.classList.add('animated');
+    });
+  </script>
+</body>
+</html>

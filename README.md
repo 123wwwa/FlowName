@@ -2,9 +2,9 @@
 
 ![FlowName wordmark with connected identifiers becoming meaningful names](docs/assets/flowname-banner.svg)
 
-![FlowName versus Humanify on API calls, total tokens and variable-name quality in two measured comparisons](docs/assets/benchmark-comparison.svg)
+[![FlowName versus Humanify on API calls, total tokens and variable-name quality in two measured comparisons](docs/assets/benchmark-comparison.svg)](https://123wwwa.github.io/FlowName/benchmarks/comparison.html)
 
-*Name quality shows the ratio of names exclusively preferred by an automated, uncalibrated Jev evaluation. [See the exact counts, method and limitations →](https://123wwwa.github.io/FlowName/benchmarks/)*
+*Name quality shows the ratio of names exclusively preferred by an automated, uncalibrated Jev evaluation. [Animated chart →](https://123wwwa.github.io/FlowName/benchmarks/comparison.html) · [Exact counts, method and limitations →](https://123wwwa.github.io/FlowName/benchmarks/)*
 
 **[Try FlowName in your browser →](https://123wwwa.github.io/FlowName/)** — enter your JavaScript, API key and model; no installation required.
 
