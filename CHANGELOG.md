@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.2
+
+- Add CLI API key flags (`--api-key` / `-k`) and the `-m` model alias.
+- Load CLI provider settings from `.env`, with flags taking precedence over the environment and `.env`.
+- Warn about conflicting configuration sources without displaying their values.
+- Show provider error details and missing configuration settings in CLI diagnostics.
+
 ## 1.0.1
 
 - Add the FlowName banner and concise Humanify comparison to the README.
