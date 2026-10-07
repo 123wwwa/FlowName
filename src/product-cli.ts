@@ -6,17 +6,22 @@ import {pathToFileURL} from 'node:url';
 import {randomUUID} from 'node:crypto';
 import type {RecoveryEvent} from './library.js';
 import {recoverNames,createProvider} from './library.js';
+import {parseDotenv,resolveProviderFlags} from './provider-config.js';
 import {createHtmlReporter} from './html-reporter.js';
 async function main(){
- const {values:v,positionals}=parseArgs({allowPositionals:true,options:{'request-propagation':{type:'string',default:'off'},'context-mode':{type:'string',default:'usage'},'prompt-format':{type:'string',default:'compact'},passes:{type:'string',default:'1'},help:{type:'boolean'},report:{type:'boolean',default:false},out:{type:'string'},provider:{type:'string',default:'gemini'},model:{type:'string'},'base-url':{type:'string'},concurrency:{type:'string',default:'4'},rpm:{type:'string',default:'60'},'max-calls':{type:'string',default:'10000'}}});
- if(v.help||!positionals.length){console.log('Usage: flowname input.js [options]\nDefaults: Gemini / gemini-3.5-flash-lite (unless overridden by environment), concurrency 4, RPM 60, max calls 10000, one pass, compact prompts, bounded use context.\nOutput: a unique flowname-output-TIMESTAMP-ID directory in the current directory.\nOptions: --out NEW_DIRECTORY --report --provider gemini|compatible --model MODEL --base-url URL --concurrency N --rpm N --max-calls N --passes 1|2 --prompt-format compact|verbose --context-mode usage|declarations --request-propagation off|linked\nLinked propagation waits for related earlier groups and adds bounded name hints; it may increase tokens and latency.\nSet GEMINI_API_KEY or FLOWNAME_API_KEY in the environment. Add --report to generate a live HTML report and print its file URL. Without it, only output.js and result.json are saved. One corrective retry for model JSON/ID errors within budgets; no transport retries.');return;}
+ const {values:v,positionals}=parseArgs({allowPositionals:true,options:{'request-propagation':{type:'string',default:'off'},'context-mode':{type:'string',default:'usage'},'prompt-format':{type:'string',default:'compact'},passes:{type:'string',default:'1'},help:{type:'boolean'},report:{type:'boolean',default:false},out:{type:'string'},provider:{type:'string',default:'gemini'},model:{type:'string',short:'m'},'api-key':{type:'string',short:'k'},'base-url':{type:'string'},concurrency:{type:'string',default:'4'},rpm:{type:'string',default:'60'},'max-calls':{type:'string',default:'10000'}}});
+ if(v.help||!positionals.length){console.log('Usage: flowname input.js [options]\nDefaults: Gemini / gemini-3.5-flash-lite (unless overridden by flags, environment or .env), concurrency 4, RPM 60, max calls 10000, one pass, compact prompts, bounded use context.\nOutput: a unique flowname-output-TIMESTAMP-ID directory in the current directory.\nOptions: --out NEW_DIRECTORY --report --provider gemini|compatible --model/-m MODEL --api-key/-k KEY --base-url URL --concurrency N --rpm N --max-calls N --passes 1|2 --prompt-format compact|verbose --context-mode usage|declarations --request-propagation off|linked\nLinked propagation waits for related earlier groups and adds bounded name hints; it may increase tokens and latency.\nSettings: API key from GEMINI_API_KEY or FLOWNAME_API_KEY, endpoint from FLOWNAME_BASE_URL, model from FLOWNAME_MODEL. The --api-key/--base-url/--model flags take precedence, then the environment, then .env in the current directory; differing values print a warning. A key passed as a flag may be visible in shell history and process listings. Failed requests print the provider error to stderr. Add --report to generate a live HTML report and print its file URL. Without it, only output.js and result.json are saved. One corrective retry for model JSON/ID errors within budgets; no transport retries.');return;}
  if(positionals.length!==1)throw new Error('Supply exactly one input file.');
  const promptFormat=v['prompt-format'];if(promptFormat!=='compact'&&promptFormat!=='verbose')throw new Error('--prompt-format must be compact or verbose.');
  const contextMode=v['context-mode'];if(contextMode!=='usage'&&contextMode!=='declarations')throw new Error('--context-mode must be usage or declarations.');
  const requestPropagation=v['request-propagation'];if(requestPropagation!=='off'&&requestPropagation!=='linked')throw new Error('--request-propagation must be off or linked.');
  const passes=Number(v.passes);if(passes!==1&&passes!==2)throw new Error('--passes must be 1 or 2.');
  const code=await readFile(resolve(positionals[0]),'utf8');
- const provider=createProvider({provider:v.provider,model:v.model,baseUrl:v['base-url'],timeoutMs:60000});
+ let dotenv:Record<string,string>={};
+ try{dotenv=parseDotenv(await readFile(resolve('.env'),'utf8'));}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;}
+ const settings=resolveProviderFlags({provider:v.provider,model:v.model,apiKey:v['api-key'],baseUrl:v['base-url'],timeoutMs:60000},process.env,dotenv);
+ for(const warning of settings.warnings)console.error(warning);
+ const provider=createProvider(settings.flags);
  const directory=resolve(v.out??`flowname-output-${new Date().toISOString().replace(/[:.]/g,'-')}-${randomUUID().slice(0,8)}`);await mkdir(dirname(directory),{recursive:true});
  const reporter=v.report?await createHtmlReporter(directory):undefined;
  if(!reporter)await mkdir(directory,{recursive:false});
@@ -24,7 +29,11 @@ async function main(){
  if(reporter)console.log('Live report (open in your browser): '+pathToFileURL(reporter.path).href);
  let total=0,done=0,active=0,failed=0,retries=0,input=0,output=0,unknown=false;
  const progress=(event:RecoveryEvent)=>{
-  if(event.type==='response')console.error(`Request ${(event.index??0)+1}: actual tokens in/out: ${event.inputTokens??'Unknown'} / ${event.outputTokens??'Unknown'}`);
+  if(event.type==='response'){
+   if(process.stderr.isTTY){process.stderr.clearLine(0);process.stderr.cursorTo(0);}
+   console.error(`Request ${(event.index??0)+1}: actual tokens in/out: ${event.inputTokens??'Unknown'} / ${event.outputTokens??'Unknown'}`);
+   if(event.error)console.error(`Request ${(event.index??0)+1} failed: ${event.error}`);
+  }
   if(event.total!==undefined)total=event.total;
   if(event.type==='request'){active++;if((event.attempt??1)>1)retries++;}
   if(event.type==='response'){

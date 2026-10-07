@@ -75,6 +75,14 @@ export function requestBody(request:InferenceRequest,model:string){
   return {model,temperature:0,messages:[{role:'user',content:promptFor(request)}],response_format:{type:'json_object'},...(reserve===undefined?{}:{max_tokens:reserve})};
 }
 
+/** Short provider-supplied reason from an error body; the API key is already redacted. */
+function errorDetail(raw:string){
+  let text=raw;
+  try{const body=JSON.parse(raw);const error=(Array.isArray(body)?body[0]:body)?.error;text=typeof error==='string'?error:typeof error?.message==='string'?error.message:raw;}catch{/* not JSON; use the body text */}
+  text=text.replace(/\s+/g,' ').trim();
+  return text?': '+(text.length>300?text.slice(0,300)+'…':text):'.';
+}
+
 /** Generic chat-completions compatible endpoint; no SDK or provider lock-in. */
 export class CompatibleProvider implements Provider {
   label: string;
@@ -104,7 +112,7 @@ export class CompatibleProvider implements Provider {
     const rawResponse=Buffer.concat(chunks).toString('utf8').split(this.config.apiKey).join('[REDACTED]');
     const retryHeader=response.headers.get('retry-after');
     const retryAfterMs=retryHeader===null?undefined:Math.max(0,/^\d+(\.\d+)?$/.test(retryHeader)?Number(retryHeader)*1000:Date.parse(retryHeader)-Date.now());
-    if (!response.ok) throw new ModelResponseError(`Model endpoint returned HTTP ${response.status}.`,rawResponse,response.status,undefined,Number.isFinite(retryAfterMs)?retryAfterMs:undefined);
+    if (!response.ok) throw new ModelResponseError(`Model endpoint returned HTTP ${response.status}${errorDetail(rawResponse)}`,rawResponse,response.status,undefined,Number.isFinite(retryAfterMs)?retryAfterMs:undefined);
     let data: { choices?: Array<{ message?: { content?: string } }>; usage?: { prompt_tokens?: number; completion_tokens?: number; [key: string]: unknown } };
     try {data=JSON.parse(rawResponse);}catch {throw new ModelResponseError('Model endpoint returned invalid JSON.',rawResponse,response.status);}
     if(!data||typeof data!=='object'||!Array.isArray(data.choices))throw new ModelResponseError('Invalid response envelope.',rawResponse,response.status);

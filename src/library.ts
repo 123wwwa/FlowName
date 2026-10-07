@@ -118,7 +118,8 @@ export async function recoverNames(code:string,options:RecoveryOptions):Promise<
      if(!e.usageRecorded)recordUsage(i,o);
      if([401,403,429].includes(e.httpStatus??0))stop=true;
      needsRepair=error instanceof ModelFormatError;
-     event={type:'response',index,error:error instanceof Error?error.message:String(error),unresolved:Object.fromEntries(missing.map(id=>[id,'No valid response.'])),inputTokens:i??null,outputTokens:o??null};
+     // Transport failures carry the useful reason (DNS, refused connection) in their cause.
+     event={type:'response',index,error:error instanceof Error?error.message+(error.cause instanceof Error?` (${error.cause.message})`:''):String(error),unresolved:Object.fromEntries(missing.map(id=>[id,'No valid response.'])),inputTokens:i??null,outputTokens:o??null};
     }
     if(consecutive>=3)stop=true;
     let repair:InferenceRequest|undefined;

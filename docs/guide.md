@@ -120,7 +120,7 @@ CLI: `flowname input.js --out ./new-report --passes 2`. Library: `recoverNames(s
 
 The CLI always shows completed responses, in-flight calls, response errors, retries and observed input/output tokens in the terminal. Missing usage is marked as unavailable rather than counted as zero. TTY output updates in place; redirected output uses progress lines on stderr.
 
-Run `flowname input.js` with your API key in `GEMINI_API_KEY` or `FLOWNAME_API_KEY`; no flags are required. The CLI does not load `.env` automatically. It creates a unique `flowname-output-TIMESTAMP-ID` directory relative to the current working directory and prints the absolute path. Repeated runs create separate directories and do not overwrite the input. Use `--out ./new-output` to choose a new directory explicitly. By default, only `output.js` and `result.json` are saved. Add `--report` to also write `events.jsonl` and a live `index.html`. The CLI prints a `file:///` URL you can open in your browser; no HTTP server or automatic browser launch is needed. The report refreshes every two seconds during recovery and remains available afterward. An explicit output directory must be new in both modes.
+Run `flowname input.js` with your API key in `GEMINI_API_KEY` or `FLOWNAME_API_KEY`, set in the environment or in a `.env` file in the current directory; no flags are required. It creates a unique `flowname-output-TIMESTAMP-ID` directory relative to the current working directory and prints the absolute path. Repeated runs create separate directories and do not overwrite the input. Use `--out ./new-output` to choose a new directory explicitly. By default, only `output.js` and `result.json` are saved. Add `--report` to also write `events.jsonl` and a live `index.html`. The CLI prints a `file:///` URL you can open in your browser; no HTTP server or automatic browser launch is needed. The report refreshes every two seconds during recovery and remains available afterward. An explicit output directory must be new in both modes.
 
 | Option | Default |
 | --- | --- |
@@ -132,7 +132,7 @@ Run `flowname input.js` with your API key in `GEMINI_API_KEY` or `FLOWNAME_API_K
 | Prompt bytes / targets per request | 12,000 / 16 |
 | HTML report | Off; enable with `--report` |
 
-`FLOWNAME_MODEL` and `FLOWNAME_BASE_URL` override the default model and endpoint; explicit flags take precedence. Default call limits are ceilings, not an instruction to spend that many calls. Use `--max-calls` for a smaller limit. Run `flowname --help` for optional overrides.
+`FLOWNAME_MODEL` and `FLOWNAME_BASE_URL` override the default model and endpoint. The API key, endpoint and model are each taken from the `--api-key`, `--base-url` and `--model` flags first, then the environment, then `.env` in the current directory; when sources disagree the CLI prints a warning naming them. Failed requests print the provider's reason to stderr. Default call limits are ceilings, not an instruction to spend that many calls. Use `--max-calls` for a smaller limit. Run `flowname --help` for optional overrides.
 
 ## Prompt format
 

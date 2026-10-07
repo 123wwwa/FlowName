@@ -471,3 +471,42 @@ test('CLI input-only invocation uses defaults and creates separate output direct
  assert.equal(await readFile(join(root,'input.js'),'utf8'),source);
  }finally{await new Promise(r=>server.close(r));}
 });
+
+test('CLI accepts endpoint, model and API key as flags without environment configuration',async()=>{
+ const {createServer}=await import('node:http');const {execFile}=await import('node:child_process');const {promisify}=await import('node:util');const {resolve}=await import('node:path');const {writeFile}=await import('node:fs/promises');
+ const root=await mkdtemp(join(tmpdir(),'flowname-flags-'));await writeFile(join(root,'input.js'),'const a=1;console.log(a);');
+ const seen=[];const server=createServer(async(req,res)=>{let raw='';for await(const c of req)raw+=c;const body=JSON.parse(raw);seen.push([req.headers.authorization,body.model]);if(body.model==='bad-model'){res.statusCode=400;res.end(JSON.stringify({error:{message:'Unknown model bad-model'}}));return;}const payload=JSON.parse(body.messages[0].content.split('\n').find(l=>l.startsWith('{')));res.setHeader('Content-Type','application/json');res.end(JSON.stringify({choices:[{message:{content:JSON.stringify({names:Object.fromEntries(payload.targets.map(t=>[t.id,'value']))})}}],usage:{prompt_tokens:10,completion_tokens:3}}));});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));
+ try{const env={...process.env};for(const name of ['GEMINI_API_KEY','GOOGLE_API_KEY','FLOWNAME_API_KEY','FLOWNAME_BASE_URL','FLOWNAME_MODEL'])delete env[name];
+ const run=args=>promisify(execFile)(process.execPath,[resolve('dist/product-cli.js'),'input.js',...args],{cwd:root,env});
+ const base=`http://127.0.0.1:${server.address().port}`;
+ const {stdout}=await run(['--base-url',base,'--model','flag-model','--api-key','flag-key']);assert.match(stdout,/completed: 1 calls/);
+ await run(['--base-url',base,'-m','short-model','-k','short-key']);
+ assert.deepEqual(seen,[['Bearer flag-key','flag-model'],['Bearer short-key','short-model']]);
+ await assert.rejects(run(['--base-url',base,'--model','flag-model']),e=>/Missing API key \(--api-key\/-k or FLOWNAME_API_KEY, GEMINI_API_KEY, GOOGLE_API_KEY\)\./.test(e.stderr)&&!/base URL|model \(/.test(e.stderr));
+ assert.equal(seen.length,2);
+ await assert.rejects(run(['--base-url',base,'-m','bad-model','-k','flag-key']),e=>/Request 1 failed: Model endpoint returned HTTP 400: Unknown model bad-model/.test(e.stderr));
+ }finally{await new Promise(r=>server.close(r));}
+});
+
+test('CLI prefers flags, then the environment, then .env, warning when sources differ',async()=>{
+ const {createServer}=await import('node:http');const {execFile}=await import('node:child_process');const {promisify}=await import('node:util');const {resolve}=await import('node:path');const {writeFile}=await import('node:fs/promises');
+ const root=await mkdtemp(join(tmpdir(),'flowname-dotenv-'));await writeFile(join(root,'input.js'),'const a=1;console.log(a);');
+ const seen=[];const server=createServer(async(req,res)=>{let raw='';for await(const c of req)raw+=c;const body=JSON.parse(raw);seen.push([req.headers.authorization,body.model]);const payload=JSON.parse(body.messages[0].content.split('\n').find(l=>l.startsWith('{')));res.setHeader('Content-Type','application/json');res.end(JSON.stringify({choices:[{message:{content:JSON.stringify({names:Object.fromEntries(payload.targets.map(t=>[t.id,'value']))})}}],usage:{prompt_tokens:10,completion_tokens:3}}));});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));
+ try{const base=`http://127.0.0.1:${server.address().port}`;
+ const env={...process.env,GEMINI_API_KEY:'env-key',FLOWNAME_MODEL:'env-model'};for(const name of ['GOOGLE_API_KEY','FLOWNAME_API_KEY','FLOWNAME_BASE_URL'])delete env[name];
+ const run=args=>promisify(execFile)(process.execPath,[resolve('dist/product-cli.js'),'input.js',...args],{cwd:root,env});
+ await writeFile(join(root,'.env'),`# comment\nGEMINI_API_KEY="file-key"\nFLOWNAME_BASE_URL=${base}\nUNRELATED=1\n`);
+ const first=await run(['--api-key','flag-key','--model','flag-model']);
+ assert.deepEqual(seen,[['Bearer flag-key','flag-model']]);
+ assert.match(first.stderr,/Warning: API key differs between --api-key, environment GEMINI_API_KEY, \.env GEMINI_API_KEY; using --api-key\./);
+ assert.match(first.stderr,/Warning: model differs between --model, environment FLOWNAME_MODEL; using --model\./);
+ assert.doesNotMatch(first.stderr,/base URL differs|file-key|env-key|flag-key/);
+ const second=await run([]);
+ assert.deepEqual(seen[1],['Bearer env-key','env-model']);assert.match(second.stderr,/using environment GEMINI_API_KEY\./);
+ await writeFile(join(root,'.env'),`GEMINI_API_KEY=env-key\nFLOWNAME_BASE_URL=${base}\n`);
+ const third=await run(['--api-key','env-key']);
+ assert.deepEqual(seen[2],['Bearer env-key','env-model']);assert.doesNotMatch(third.stderr,/Warning/);
+ }finally{await new Promise(r=>server.close(r));}
+});

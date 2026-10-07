@@ -24,13 +24,21 @@ In a second comparison on GrobPaint's 1,786 anonymized bindings, FlowName used 4
 
 ## Run it
 
-Set `GEMINI_API_KEY` (or `FLOWNAME_API_KEY`) in your environment, then run:
+Set `GEMINI_API_KEY` (or `FLOWNAME_API_KEY`) in your environment or in a `.env` file in the current directory, then run:
 
 ```sh
 npx --yes --package=flowname@latest flowname input.js
 ```
 
-The CLI writes recovered code to a new `flowname-output-TIMESTAMP-ID/output.js` directory. Add `--report` to watch each request and proposed name in a live HTML report. No flags are required for the default Gemini model; the CLI does not load `.env` automatically. Requires Node.js 22.8+.
+To use another OpenAI-compatible endpoint, or to skip environment variables, pass everything as flags:
+
+```sh
+npx --yes --package=flowname@latest flowname input.js --base-url https://api.openai.com/v1 --model MODEL --api-key YOUR_API_KEY
+```
+
+Flags take precedence, then the environment, then `.env`; the CLI warns when they disagree. A key passed as a flag may be visible in shell history and process listings.
+
+The CLI writes recovered code to a new `flowname-output-TIMESTAMP-ID/output.js` directory. Add `--report` to watch each request and proposed name in a live HTML report. No flags are required for the default Gemini model. Requires Node.js 22.8+.
 
 For the browser, open the [playground](https://123wwwa.github.io/FlowName/), paste JavaScript, supply your own API key and start recovery. Requests go directly from your browser to the selected provider; **Stop** interrupts the run.
 
