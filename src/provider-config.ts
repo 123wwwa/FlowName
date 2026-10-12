@@ -24,9 +24,11 @@ export function parseDotenv(text: string): Record<string,string> {
 }
 
 /** CLI precedence: flags, then process environment, then the .env file. Differing values produce a warning that names the sources, never the values. */
-export function resolveProviderFlags(flags: ProviderFlags, env: Values, dotenv: Values): { flags: ProviderFlags; warnings: string[] } {
-  if (flags.provider === 'mock') return { flags, warnings: [] };
+export function resolveProviderFlags(flags: ProviderFlags, env: Values, dotenv: Values): { flags: ProviderFlags; warnings: string[]; sources: Record<string,string> } {
+  if (flags.provider === 'mock') return { flags, warnings: [], sources: {} };
   const warnings: string[] = [];
+  // Where each setting came from, for diagnostics; never the value itself.
+  const sources: Record<string,string> = {};
   const pick = (setting: string, names: string[], flagName: string, flagValue?: string) => {
     const found: Array<{ source: string; value: string }> = [];
     if (flagValue) found.push({ source: flagName, value: flagValue });
@@ -35,6 +37,7 @@ export function resolveProviderFlags(flags: ProviderFlags, env: Values, dotenv: 
       if (name) found.push({ source: `${label} ${name}`, value: values[name]! });
     }
     if (new Set(found.map(entry => entry.value)).size > 1) warnings.push(`Warning: ${setting} differs between ${found.map(entry => entry.source).join(', ')}; using ${found[0]!.source}.`);
+    if (found[0]) sources[setting] = found[0].source;
     return found[0]?.value;
   };
   const keyNames = ['FLOWNAME_API_KEY', ...(flags.provider === 'gemini' ? ['GEMINI_API_KEY', 'GOOGLE_API_KEY'] : [])];
@@ -42,7 +45,7 @@ export function resolveProviderFlags(flags: ProviderFlags, env: Values, dotenv: 
     baseUrl: pick('base URL', ['FLOWNAME_BASE_URL'], '--base-url', flags.baseUrl),
     model: pick('model', ['FLOWNAME_MODEL'], '--model', flags.model),
     apiKey: pick('API key', keyNames, '--api-key', flags.apiKey),
-  }, warnings };
+  }, warnings, sources };
 }
 
 export function createProvider(flags: ProviderFlags, env: Values = process.env): Provider {

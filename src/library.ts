@@ -15,11 +15,15 @@ export interface RecoveryEvent {
  unresolved?:Record<string,string>; ignoredIds?:string[]; applied?:Record<string,string>;
  inputTokens?:number|null; outputTokens?:number|null; result?:RecoveryResult;
 }
-export interface RecoveryOptions {provider:Provider;requestPropagation?:'off'|'linked';contextMode?:ContextMode;promptFormat?:PromptFormat;passes?:1|2;concurrency?:number;rpm?:number;maxCalls?:number;promptBytes?:number;maxTargets?:number;signal?:AbortSignal;onEvent?:(event:RecoveryEvent)=>void|Promise<void>;}
+export interface RecoveryOptions {provider:Provider;requestPropagation?:'off'|'linked';contextMode?:ContextMode;promptFormat?:PromptFormat;passes?:1|2;concurrency?:number;rpm?:number;maxCalls?:number;promptBytes?:number;maxTargets?:number;
+ /** Trial run: send only the first N planned requests. The result is always partial. */
+ sampleRequests?:number;signal?:AbortSignal;onEvent?:(event:RecoveryEvent)=>void|Promise<void>;}
 export interface RecoveryResult {code:string;proposed:Record<string,string>;accepted:Record<string,string>;rejected:Record<string,string>;adjustments:Record<string,string>;status:'completed'|'partial'|'cancelled';calls:number;plannedCalls:number;failedCalls:number;inputTokens:number|null;outputTokens:number|null;warnings:string[];}
-/** Shared call/rate budgets across at most two passes and one repair per group. */
-export async function recoverNames(code:string,options:RecoveryOptions):Promise<RecoveryResult>{
- const {provider,signal}=options;
+export interface RecoveryPlan {identifiers:number;calls:number;promptBytes:number;largestPromptBytes:number;warnings:string[];}
+type PlanOptions=Omit<RecoveryOptions,'provider'|'onEvent'>;
+/** Validates options, analyzes the source and plans every pass before any provider access. */
+function prepare(code:string,options:PlanOptions){
+ const {signal}=options;
  const requestPropagation=options.requestPropagation??'off';
  if(requestPropagation!=='off'&&requestPropagation!=='linked')throw new Error('requestPropagation must be off or linked.');
  const contextMode=options.contextMode??'usage';
@@ -31,6 +35,8 @@ export async function recoverNames(code:string,options:RecoveryOptions):Promise<
  const concurrency=options.concurrency??4,rpm=options.rpm??60,maxCalls=options.maxCalls??10000,promptBytes=options.promptBytes??12000;
  for(const n of [concurrency,rpm,maxCalls])if(!Number.isSafeInteger(n)||n<1)throw new Error('Execution limits must be positive integers.');
  if(concurrency>32)throw new Error('Maximum concurrency is 32.');
+ const sample=options.sampleRequests;
+ if(sample!==undefined&&(!Number.isSafeInteger(sample)||sample<1))throw new Error('sampleRequests must be a positive integer.');
  signal?.throwIfAborted();
  const originalAnalysis=lightweight(code);
  const allIds=originalAnalysis.symbols.filter(s=>s.eligible).map(s=>s.id);
@@ -39,13 +45,31 @@ export async function recoverNames(code:string,options:RecoveryOptions):Promise<
  const phases=passes===2&&priority.length&&localIds.length?[priority,localIds]:[allIds];
  const plan=(source:string,analysis:Analysis,ids:string[])=>budgetedRequests(source,analysis,ids,promptBytes,options.maxTargets,promptFormat,contextMode);
  // Preflight both sets on the original source. Pass two is rebuilt after application.
- const initialPlans=phases.map(ids=>plan(code,originalAnalysis,ids));
+ const fullPlans=phases.map(ids=>plan(code,originalAnalysis,ids));
+ const fullCalls=fullPlans.reduce((n,requests)=>n+requests.length,0);
+ // A sample takes requests in plan order, so a small one may never reach pass two.
+ let left=sample??Infinity;
+ const quotas=fullPlans.map(requests=>{const quota=Math.min(requests.length,left);left-=quota;return quota;});
+ const initialPlans=fullPlans.map((requests,i)=>requests.slice(0,quotas[i]));
+ return {signal,requestPropagation,passes,concurrency,rpm,maxCalls,promptBytes,sample,originalAnalysis,allIds,phases,plan,initialPlans,quotas,fullCalls};
+}
+/** API-free preview of the initial plan. Repairs and a rebuilt second pass can change the totals of a real run. */
+export function planRecovery(code:string,options:PlanOptions={}):RecoveryPlan{
+ const {originalAnalysis,allIds,initialPlans}=prepare(code,options);
+ const bytes=initialPlans.flat().map(request=>request.budgeting.promptBytes);
+ return {identifiers:allIds.length,calls:bytes.length,promptBytes:bytes.reduce((n,size)=>n+size,0),largestPromptBytes:Math.max(0,...bytes),warnings:[...originalAnalysis.warnings]};
+}
+/** Shared call/rate budgets across at most two passes and one repair per group. */
+export async function recoverNames(code:string,options:RecoveryOptions):Promise<RecoveryResult>{
+ const {provider}=options;
+ const {signal,requestPropagation,concurrency,rpm,maxCalls,promptBytes,sample,originalAnalysis,allIds,phases,plan,initialPlans,quotas,fullCalls}=prepare(code,options);
  let plannedCalls=initialPlans.reduce((n,requests)=>n+requests.length,0);
  if(plannedCalls>maxCalls)throw new Error(`Plan requires ${plannedCalls} calls, exceeding maxCalls=${maxCalls}. No requests sent.`);
- let stop=false,count=0,failed=0,consecutive=0,next=0,input=0,output=0,known=true,retries=0,groupCounter=0,repairReservations=0,requestCounter=0;
+ let stop=false,count=0,failed=0,consecutive=0,next=0,pausedUntil=0,rateLimitWaits=0,input=0,output=0,known=true,retries=0,groupCounter=0,repairReservations=0,requestCounter=0;
  let currentCode=code,currentAnalysis=originalAnalysis;
  const names:Record<string,string>={},accepted:Record<string,string>={},rejected:Record<string,string>={},adjustments:Record<string,string>={};
  const warnings=[...originalAnalysis.warnings];
+ if(sample!==undefined&&plannedCalls<fullCalls)warnings.push(`Sample run: sending the first ${plannedCalls} of ${fullCalls} planned requests.`);
  const resolved=new Set<string>();
  const emit=async(event:Omit<RecoveryEvent,'time'>)=>{try{await options.onEvent?.({...event,time:new Date().toISOString()});}catch(error){stop=true;throw error;}};
  const pace=serialWriter(async()=>{
@@ -65,6 +89,7 @@ export async function recoverNames(code:string,options:RecoveryOptions):Promise<
    try{
     currentAnalysis=rebaseAnalysis(currentCode,originalAnalysis,accepted);
     requests=plan(currentCode,currentAnalysis,phases[phase]!);
+    if(sample!==undefined)requests=requests.slice(0,quotas[phase]);
    }catch(error){warnings.push(`Pass 2 skipped: ${error instanceof Error?error.message:String(error)}`);stop=true;break;}
    plannedCalls+=requests.length-initialPlans[phase]!.length;
    if(count+requests.length>maxCalls){warnings.push('Pass 2 skipped: updated context exceeds remaining call budget.');stop=true;break;}
@@ -89,7 +114,7 @@ export async function recoverNames(code:string,options:RecoveryOptions):Promise<
     const index=requestCounter++;count++;if(attempt===1)pendingInitial--;
     await emit({type:'request',index,groupIndex,attempt,pass,total:plannedCalls+retries,request,prompt:promptFor(request)});
     if(stop||signal?.aborted){count--;return;}
-    let event:Omit<RecoveryEvent,'time'>,needsRepair=false;
+    let event:Omit<RecoveryEvent,'time'>,needsRepair=false,retryAfter:number|undefined;
     let missing=request.targets.map(t=>t.id);
     try{
      const response=await provider.infer(request);
@@ -109,29 +134,43 @@ export async function recoverNames(code:string,options:RecoveryOptions):Promise<
      if(needsRepair)failed++;
      // Useful partial progress breaks the consecutive no-progress failure streak.
      consecutive=Object.keys(valid).length?0:consecutive+1;
+     if(Object.keys(valid).length)rateLimitWaits=0;
      event={type:'response',index,names:valid,unresolved:Object.fromEntries(missing.map(id=>[id,unresolved[id]!])),ignoredIds:[...new Set([...parsed.validation.ignoredIds,...(response.validation?.ignoredIds??[])])],inputTokens:response.inputTokens,outputTokens:response.outputTokens};
      if(needsRepair)event.error=`Partial response: ${missing.length} unresolved target(s).`;
     }catch(error){
-     failed++;consecutive++;
-     const e=error as {httpStatus?:number;usageRecorded?:boolean;usage?:{prompt_tokens?:number;completion_tokens?:number}};
+     failed++;
+     const e=error as {httpStatus?:number;retryAfterMs?:number;usageRecorded?:boolean;usage?:{prompt_tokens?:number;completion_tokens?:number}};
      const i=e.usage?.prompt_tokens,o=e.usage?.completion_tokens;
      if(!e.usageRecorded)recordUsage(i,o);
-     if([401,403,429].includes(e.httpStatus??0))stop=true;
+     // A provider Retry-After of at most a minute pauses pacing and repeats this request
+     // once. Requests failing during the same pause share it; a third pause ends the run.
+     const wait=e.httpStatus===429&&attempt===1&&e.retryAfterMs!==undefined&&e.retryAfterMs<=60000?e.retryAfterMs:undefined;
+     if(wait!==undefined&&(Date.now()<pausedUntil||rateLimitWaits<2)){
+      if(Date.now()>=pausedUntil)rateLimitWaits++;
+      pausedUntil=Math.max(pausedUntil,Date.now()+wait);next=Math.max(next,pausedUntil);retryAfter=wait;
+     }else{
+      consecutive++;
+      if([401,403,429].includes(e.httpStatus??0))stop=true;
+     }
      needsRepair=error instanceof ModelFormatError;
      // Transport failures carry the useful reason (DNS, refused connection) in their cause.
      event={type:'response',index,error:error instanceof Error?error.message+(error.cause instanceof Error?` (${error.cause.message})`:''):String(error),unresolved:Object.fromEntries(missing.map(id=>[id,'No valid response.'])),inputTokens:i??null,outputTokens:o??null};
     }
     if(consecutive>=3)stop=true;
     let repair:InferenceRequest|undefined;
-    if(needsRepair&&attempt===1){
+    if((needsRepair||retryAfter!==undefined)&&attempt===1){
      const ids=new Set(missing);
-     const candidate={...original,formatRepair:true,targets:original.targets.filter(t=>ids.has(t.id)),relations:original.relations.filter(r=>ids.has(r.from)&&ids.has(r.to))};
+     const candidate=retryAfter!==undefined?request:{...original,formatRepair:true,targets:original.targets.filter(t=>ids.has(t.id)),relations:original.relations.filter(r=>ids.has(r.from)&&ids.has(r.to))};
      const repairBytes=Buffer.byteLength(promptFor(candidate));
-     const budgetedCandidate=Object.assign(candidate,{budgeting:{...base.budgeting,promptBytes:repairBytes,outputReserveTokens:128+64*missing.length}});
+     const budgetedCandidate=retryAfter!==undefined?candidate:Object.assign(candidate,{budgeting:{...base.budgeting,promptBytes:repairBytes,outputReserveTokens:128+64*missing.length}});
      if(stop||signal?.aborted)event.retrySkipped='Run stopped or cancelled.';
      else if(count+pendingInitial+futureReserved+repairReservations>=maxCalls)event.retrySkipped='No spare maxCalls budget after reserving initial requests.';
      else if(repairBytes>promptBytes)event.retrySkipped='Correction would exceed promptBytes.';
      else {repair=budgetedCandidate;repairReservations++;}
+     if(retryAfter!==undefined){
+      // Without a retry the rate limit ends the run, as it does without Retry-After.
+      if(repair)event.error+=` Retrying once after ${Math.ceil(retryAfter/1000)}s.`;else stop=true;
+     }
     }
     await emit({...event,groupIndex,attempt,pass});
     if(!repair||stop||signal?.aborted)return;

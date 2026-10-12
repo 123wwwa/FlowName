@@ -26,7 +26,6 @@ export interface Analysis {
   warnings: string[];
   flowMode: 'structured-cfg' | 'conservative' | 'lexical-relations';
 }
-export type Strategy = 'individual' | 'batch' | 'flow' | 'flow-relations';
 export type PromptFormat = 'compact' | 'verbose';
 export interface InferenceRequest {
   previousNames?: Array<{id:string;name:string;at:number;suggested:string}>;

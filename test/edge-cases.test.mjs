@@ -168,48 +168,102 @@ test('custom-provider malformed response and repair count known usage exactly on
  assert.equal(responses.reduce((n,e)=>n+e.inputTokens,0),r.inputTokens);assert.equal(responses.reduce((n,e)=>n+e.outputTokens,0),r.outputTokens);
 });
 
-test('shadowed direct eval can still be the intrinsic and disables renames in both analyzers',async()=>{
- const {analyze}=await import('../dist/analysis.js');
+test('shadowed direct eval can still be the intrinsic and disables renames',async()=>{
  const source='function f(eval){let secret=42;return eval("secret");}globalThis.answer=f(globalThis.eval);';
  assert.equal(outcome(source),JSON.stringify({answer:42}));
- for(const analyzeSource of [analyze,lightweight]){
-  const analysis=analyzeSource(source);assert.ok(analysis.symbols.every(s=>!s.eligible));assert.match(analysis.warnings.join(' '),/eval/);
+ {
+  const analysis=lightweight(source);assert.ok(analysis.symbols.every(s=>!s.eligible));assert.match(analysis.warnings.join(' '),/eval/);
   const secret=analysis.symbols.find(s=>s.name==='secret');const result=rename(source,analysis,{[secret.id]:'value'});assert.equal(outcome(result.code),outcome(source));assert.ok(result.rejected[secret.id]);
  }
  let calls=0;const result=await recoverNames(source,{provider:{label:'must not call',async infer(){calls++;throw Error('Unexpected call');}}});assert.equal(calls,0);assert.equal(outcome(result.code),outcome(source));
  for(const source of ['const eval = globalThis.eval; eval("x");','function f(eval){return (eval)("x");}'])assert.ok(lightweight(source).symbols.every(s=>!s.eligible));
 });
 
-test('write-only closures force conservative definitions including the inner assignment',async()=>{
- const {analyze}=await import('../dist/analysis.js');
- for(const write of ['x=1','x++','x+=1','({x}=obj)','for(x of values){}']){
-  const source=`let x=0;function set(){${write};}set();x;`,analysis=analyze(source),symbol=analysis.symbols.find(s=>s.name==='x');
-  assert.equal(analysis.flowMode,'conservative');assert.match(analysis.warnings.join(' '),/cross-function/);
-  const use=analysis.uses.find(u=>u.span.start===source.lastIndexOf('x;'));
-  assert.ok(use);assert.ok(use.definitions.length>=2);
-  assert.ok(analysis.definitions.some(d=>d.symbol===symbol.id&&d.span.start>source.indexOf('function')));
- }
- assert.equal(analyze('let x=0;x=1;x;').flowMode,'structured-cfg');
-});
-
-test('CFG analysis protects public bindings but permits exported function internals',async()=>{
- const {analyze}=await import('../dist/analysis.js');
+test('analysis protects public bindings but permits exported function internals',()=>{
  for(const source of ['export function api(p){let a=1;return a+p;}','export default function api(p){let a=1;return a+p;}','const api=(p)=>{let a=1;return a+p;};export {api};']){
-  for(const inspect of [analyze,lightweight]){const a=inspect(source);assert.equal(a.symbols.find(s=>s.name==='api').eligible,false);for(const name of ['p','a'])assert.equal(a.symbols.find(s=>s.name===name).eligible,true);}
+  const a=lightweight(source);assert.equal(a.symbols.find(s=>s.name==='api').eligible,false);for(const name of ['p','a'])assert.equal(a.symbols.find(s=>s.name===name).eligible,true);
  }
- const a=analyze('const api=1;export {api} from "other";');assert.equal(a.symbols.find(s=>s.name==='api').eligible,true);
+ const a=lightweight('const api=1;export {api} from "other";');assert.equal(a.symbols.find(s=>s.name==='api').eligible,true);
 });
 
 test('source excerpt-looking comments cannot corrupt structured coverage',async()=>{
- const {analyze}=await import('../dist/analysis.js');const {buildRequests,contextCovers,promptFor}=await import('../dist/grouping.js');
+ const {contextCovers,promptFor}=await import('../dist/grouping.js');const {budgetedRequests}=await import('../dist/request-budget.js');
  const source='/* excerpt [0,0); may be partial */\nlet target=1;\n/* excerpt [999,9999); may be partial */\ntarget;';
- for(const fullContext of [true,false]){
-  const requests=buildRequests(source,analyze(source),'individual',{maxSymbols:12,maxPromptChars:8000,contextChars:4000,fullContext});
-  assert.equal(requests.length,1);for(const r of requests)for(const t of r.targets)assert.ok(contextCovers(r.contextRanges,t.declaration));
-  assert.ok(requests[0].context.includes('let target=1'));
-  assert.ok(!promptFor(requests[0]).includes('contextRanges'));
- }
- const long='let target="'+'x'.repeat(2000)+'";target;';
- assert.throws(()=>buildRequests(long,analyze(long),'individual',{maxSymbols:1,maxPromptChars:800,contextChars:4000,fullContext:true}),/budget/i);
+ const analysis=lightweight(source),requests=budgetedRequests(source,analysis,analysis.symbols.map(s=>s.id));
+ assert.equal(requests.length,1);for(const r of requests)for(const t of r.targets)assert.ok(contextCovers(r.contextRanges,t.declaration));
+ assert.ok(requests[0].context.includes('let target=1'));
+ assert.ok(!promptFor(requests[0]).includes('contextRanges'));
  assert.equal(contextCovers([{start:10,end:20}],{start:21,end:22}),false);
+});
+
+const functions=count=>Array.from({length:count},(_,i)=>`function f${i}(a){return a+${i};}`).join('');
+
+test('the relation cap degrades grouping instead of failing a large file',async()=>{
+ // One call with 450 distinct arguments yields more pairwise relations than the cap.
+ const names=Array.from({length:450},(_,i)=>'a'+i);
+ const source=`let ${names.map(n=>n+'=0').join(',')};function f(){}f(${names.join(',')});`;
+ const analysis=lightweight(source);
+ assert.equal(analysis.relations.length,100000);assert.match(analysis.warnings.join(' '),/Relation limit reached/);
+ const result=await recoverNames(source,{provider:provider(),rpm:600000});
+ assert.equal(result.status,'completed');assert.match(result.warnings.join(' '),/Relation limit reached/);
+});
+
+test('plan preview matches the run and a sample sends only the first requests',async()=>{
+ const {planRecovery}=await import('../dist/library.js');
+ const source=functions(40);
+ let calls=0;const counted={label:'fixture',async infer(r){calls++;return provider().infer(r);}};
+ const plan=planRecovery(source,{maxTargets:4});
+ const full=await recoverNames(source,{provider:counted,maxTargets:4,rpm:600000});
+ assert.equal(plan.identifiers,80);assert.equal(plan.calls,full.plannedCalls);assert.equal(calls,plan.calls);
+ assert.ok(plan.largestPromptBytes<=12000&&plan.promptBytes>plan.largestPromptBytes);
+ calls=0;
+ const sampled=await recoverNames(source,{provider:counted,maxTargets:4,rpm:600000,sampleRequests:3,maxCalls:3});
+ assert.equal(calls,3);assert.equal(sampled.status,'partial');assert.equal(sampled.plannedCalls,3);assert.equal(sampled.failedCalls,0);
+ assert.match(sampled.warnings.join(' '),new RegExp(`first 3 of ${plan.calls} planned requests`));
+ assert.ok(Object.keys(sampled.accepted).length>0&&Object.keys(sampled.accepted).length<=12);
+ assert.equal(planRecovery(source,{maxTargets:4,sampleRequests:3}).calls,3);
+ // A sample larger than the plan changes nothing, and two passes share one quota.
+ assert.deepEqual((await recoverNames(source,{provider:counted,maxTargets:4,rpm:600000,sampleRequests:1000})).warnings,[]);
+ calls=0;await recoverNames(source,{provider:counted,maxTargets:4,rpm:600000,passes:2,sampleRequests:2});assert.equal(calls,2);
+ calls=0;await assert.rejects(recoverNames(source,{provider:counted,sampleRequests:0}),/sampleRequests/);assert.equal(calls,0);
+ assert.throws(()=>planRecovery(source,{passes:3}),/passes/);
+});
+
+test('a bounded Retry-After is retried once and other rate limits still end the run',async()=>{
+ const {ModelResponseError}=await import('../dist/inference.js');
+ const limited=ms=>new ModelResponseError('Model endpoint returned HTTP 429: slow down','',429,undefined,ms);
+ const source='const a=1;globalThis.answer=a;',events=[];
+ let calls=0;
+ const started=Date.now();
+ const recovered=await recoverNames(source,{rpm:600000,onEvent:e=>events.push(e),provider:{label:'fixture',async infer(r){if(++calls===1)throw limited(40);return provider().infer(r);}}});
+ assert.equal(recovered.status,'completed');assert.equal(recovered.calls,2);assert.equal(recovered.failedCalls,1);assert.ok(Date.now()-started>=35);
+ assert.match(events.find(e=>e.type==='response').error,/HTTP 429: slow down Retrying once after 1s\./);
+ const run=async(ms,options={})=>{calls=0;const seen=[];const result=await recoverNames(source,{rpm:600000,onEvent:e=>seen.push(e),...options,provider:{label:'fixture',async infer(){calls++;throw limited(ms);}}});return {result,seen};};
+ // The repeated request is rate limited again: stop.
+ assert.equal((await run(5)).result.status,'partial');assert.equal(calls,2);
+ // No hint, or a wait longer than a minute: stop at once, as before.
+ for(const ms of [undefined,60001]){await run(ms);assert.equal(calls,1);}
+ // No spare call budget for the repeat: stop and say why.
+ const {seen}=await run(5,{maxCalls:1});assert.equal(calls,1);assert.match(seen.find(e=>e.type==='response').retrySkipped,/maxCalls/);
+});
+
+test('report marks an early failure and coalesces rewrites while journaling every event',async t=>{
+ const fs=(await import('node:fs/promises')).default;
+ const root=await mkdtemp(join(tmpdir(),'flowname-report-'));
+ const failed=await createHtmlReporter(join(root,'failed'));
+ assert.match(await readFile(failed.path,'utf8'),/location\.reload/);
+ await failed.fail(new Error('Plan requires 20 calls <b>'));
+ const html=await readFile(failed.path,'utf8');
+ assert.match(html,/Run failed: Plan requires 20 calls &lt;b&gt;/);assert.match(html,/>Failed</);assert.doesNotMatch(html,/location\.reload/);
+ assert.match(await readFile(join(root,'failed/events.jsonl'),'utf8'),/report-failure/);
+ const report=await createHtmlReporter(join(root,'busy')),original=fs.rename;
+ let writes=0;t.mock.method(fs,'rename',async(...args)=>{writes++;return original(...args);});
+ const result=await recoverNames(functions(60),{provider:provider(),maxTargets:2,rpm:600000,onEvent:report.onEvent});
+ const events=(await readFile(join(root,'busy/events.jsonl'),'utf8')).trim().split('\n').map(JSON.parse);
+ assert.equal(events.filter(e=>e.type==='request').length,result.calls);assert.ok(result.calls>=60);
+ // Previously one rewrite per event; now the first event, the final result and at most one per second.
+ assert.ok(writes<=10,`${writes} page rewrites for ${events.length} events`);
+ const final=await readFile(report.path,'utf8');assert.match(final,/completed/);assert.match(final,new RegExp(`Request ${result.calls} `));
+ // A failure reported after completion does not replace the result.
+ await report.fail(new Error('late'));assert.doesNotMatch(await readFile(report.path,'utf8'),/Run failed/);
 });

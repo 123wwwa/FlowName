@@ -36,7 +36,7 @@ flowchart TD
 | Module | Responsibility |
 | --- | --- |
 | [`src/passes.ts`](../src/passes.ts) | Priority target selection and verified ID rebasing after rename |
-| [`src/library.ts`](../src/library.ts) | Public API, plan gate, scheduling, event emission, failure policy and final result |
+| [`src/library.ts`](../src/library.ts) | Public API, plan gate and API-free plan preview, scheduling, event emission, failure policy and final result |
 | [`src/lightweight.ts`](../src/lightweight.ts) | Eligible bindings, source positions, reference locations and lexical relation facts |
 | [`src/request-budget.ts`](../src/request-budget.ts) | Relation-first grouping, same-scope fallback and bounded request construction |
 | [`src/grouping.ts`](../src/grouping.ts) | `promptFor`: render an inference request as model instructions and context |
@@ -44,12 +44,12 @@ flowchart TD
 | [`src/provider-config.ts`](../src/provider-config.ts) | Node-side provider configuration and environment defaults |
 | [`src/concurrency.ts`](../src/concurrency.ts) | Concurrent task pool and serialized work helper |
 | [`src/rename.ts`](../src/rename.ts) | Source identity check, binding-aware application, collision adjustments and syntax reparse |
-| [`src/html-reporter.ts`](../src/html-reporter.ts) | Optional Node filesystem observer: HTML, JSONL, output code and result JSON |
+| [`src/html-reporter.ts`](../src/html-reporter.ts) | Optional Node filesystem observer: rate-limited HTML refresh, complete JSONL journal, output code and result JSON |
 | [`src/product-cli.ts`](../src/product-cli.ts) | CLI input, options, provider, reporter and cancellation wiring |
 | [`web/options.js`](../web/options.js) | Shared web defaults and option validation |
 | [`web/app.js`](../web/app.js) | Form, request cards, suggestions, final names and download |
 
-The product calls `lightweight` and `budgetedRequests`. Research grouping helpers remain in some shared source files but are not selected by `recoverNames`. `analysis.ts` supplies parser utilities; the product does not invoke its full analysis pipeline.
+The product calls `lightweight` and `budgetedRequests`; `analysis.ts` supplies the parser utilities. The earlier research helpers (a CFG analyzer and alternative request builders) have been removed from these sources.
 
 ## Analysis and request planning
 
@@ -125,7 +125,7 @@ sequenceDiagram
 
 Concurrency limits in-flight calls; RPM spaces their start times. Responses may arrive out of order. Parseable answers retain valid target entries independently. Unknown IDs are ignored; unresolved IDs alone may receive one corrective attempt. Invalid JSON is not salvaged. Both attempts use the same pool and RPM budget. By default, names propagate only across the first-pass application boundary. With requestPropagation set to linked, a dependency-aware pool waits for selected earlier groups and supplies unverified name hints within the same pass. Independent ready groups still occupy available slots. Valid identifier spelling and binding safety are checked during final renaming.
 
-The renamer reparses the current pass source and checks its hash. It resolves collisions in source order, allowing reuse in independent scopes and conservatively protecting ancestor/descendant bindings and unresolved references. Numeric suffixes handle collisions. Temporary names permit swaps before final names are applied. Generated output is parsed again for syntax validity; this is not a behavioral-equivalence test.
+The renamer reparses the current pass source and checks its hash. It resolves collisions in source order, allowing reuse in independent scopes and conservatively protecting ancestor/descendant bindings and unresolved references. Numeric suffixes handle collisions. Each binding's declaration, reference and write nodes are collected first and then edited together, so swaps need no temporary names and the cost does not grow with the number of bindings per scope. Generated output is parsed again for syntax validity; this is not a behavioral-equivalence test.
 
 Request-card suggestions are provisional. Each pass applies accepted proposals with collision checks; pass-complete exposes applied names before the next pass. The complete result combines both passes. Original author names and semantic quality scores are not part of the product API.
 
@@ -166,6 +166,7 @@ Library and web defaults intentionally differ. Web validation runs at the browse
 | --- | --- |
 | Analysis or planning failure | Reject before inference; no automatic splitting into separate file runs |
 | HTTP 401, 403 or 429; three consecutive attempts without usable names in completion order | Stop new scheduling, drain already-started calls, finalize available proposals |
+| HTTP 429 with a `Retry-After` of at most 60 seconds, on a group's first attempt | Pause request pacing for that time and repeat the request once within `maxCalls`; a repeated limit, or a third pause without an intervening success, stops as above |
 | Model-content JSON or target-ID failure | Retain valid entries; at most one corrective retry for unresolved IDs within spare budgets; log both attempts and usage |
 | Other request failure | Emit error and continue unless the consecutive-failure threshold is reached; no automatic retry |
 | Missing token usage | Aggregate token counts become `null`, rather than counting unknown usage as zero |
@@ -173,10 +174,10 @@ Library and web defaults intentionally differ. Web validation runs at the browse
 | Web Stop / session timeout | Terminate worker and connections; received cards remain, but no final collision-checked output is guaranteed |
 | Observer failure | Reject the run and stop new scheduling; a complete result is not guaranteed |
 
-Analysis accepts up to 8 MiB of source and caps relation accumulation at 100,000. Its 30-second check is cooperative, not a hard parser timeout. Web input is limited to 8 MiB and a session to 20 minutes. Both hosted and local playgrounds analyze in a browser worker with no configured memory quota. Web provider calls use a 30-second timeout and a 1 MiB response-body limit. Already-submitted requests may incur charges after cancellation.
+Analysis accepts up to 8 MiB of source and caps relation accumulation at 100,000; past the cap the remaining bindings are grouped by scope only and the result carries a warning. Its 30-second check is cooperative, not a hard parser timeout. Web input is limited to 8 MiB and a session to 20 minutes. Both hosted and local playgrounds analyze in a browser worker with no configured memory quota. Web provider calls use a 30-second timeout and a 1 MiB response-body limit. Already-submitted requests may incur charges after cancellation.
 
 ## Observability
 
 The core emits `plan`, `request`, `response`, `pass-complete` and `complete`. Plan totals can change at the pass boundary; pass/group/attempt fields identify execution context. Web transports can additionally report `fatal`. These are execution events, not full HTTP transcripts: credentials are excluded, and the public response event contains parsed names/errors and usage rather than the entire raw provider response.
 
-The optional HTML reporter serializes writes to `events.jsonl` and replaces `index.html` through a temporary file. It refreshes every two seconds until completion, then links `output.js` and `result.json`. Browser cards consume the same core events in memory and offer a final JavaScript download; they do not use that filesystem reporter.
+The optional HTML reporter serializes writes to `events.jsonl` and replaces `index.html` through a temporary file. Every event is appended to the journal at once, while the page is rewritten at most about once per second and less often as it grows; the first event, the final result and a reported failure are always written. The page reloads itself until completion or failure, then links `output.js` and `result.json`. Browser cards consume the same core events in memory and offer a final JavaScript download; they do not use that filesystem reporter.

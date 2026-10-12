@@ -59,3 +59,23 @@ test('JSX component classification and unresolved JSX references are protected',
  const ma=lightweight(member),mid=ma.symbols.find(s=>s.name==='A').id;
  assert.match(rename(member,ma,{[mid]:'widgets'}).code,/<widgets.Item/);
 });
+
+test('direct edits cover shorthand, destructuring, repeated declarations and swapped names',()=>{
+ const code='var a=1,b=2;var a;function f(){[a,b]=[b,a];a++;for(b in {x:1}){}return {a,b};}const {a:c=a,...d}={z:3};function g({a,b:[c]},d=a){return {a,c,d};}globalThis.out=JSON.stringify([f(),c,d,a,b,g({a:5,b:[6]})]);';
+ const {r}=check(code,{a:'b',b:'a',c:'d',d:'c'},'out');
+ assert.equal(Object.keys(r.rejected).length,0);
+ // A property key keeps its spelling when its shorthand value is renamed.
+ const shorthand=check('function f(a){return {a};}',{a:'value'},'JSON.stringify(f(1))');
+ assert.match(shorthand.r.code,/a:\s*value/);
+});
+
+test('renaming stays fast with many top-level bindings',()=>{
+ // One scope traversal per binding made this quadratic; 1,500 functions took minutes.
+ let code='var q0=0;';
+ for(let i=1;i<=1500;i++)code+=`function f${i}(a,b){var c=a+b*q0;var d=f${Math.max(1,i-1)}(c,a);if(d>b){q0=d;}return d*2;}`;
+ const analysis=lightweight(code),ids=analysis.symbols.filter(s=>s.eligible).map(s=>s.id);
+ const started=Date.now(),result=rename(code,analysis,Object.fromEntries(ids.map(id=>[id,'name_'+id])));
+ assert.equal(Object.keys(result.accepted).length,ids.length);assert.equal(Object.keys(result.adjustments).length,0);
+ assert.ok(Date.now()-started<30000,`rename took ${Date.now()-started} ms`);
+ assert.doesNotMatch(result.code,/\bf1500\b|\bq0\b/);
+});

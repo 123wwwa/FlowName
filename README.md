@@ -38,6 +38,14 @@ npx --yes --package=flowname@latest flowname input.js --base-url https://api.ope
 
 Flags take precedence, then the environment, then `.env`; the CLI warns when they disagree. A key passed as a flag may be visible in shell history and process listings.
 
+Check the cost before spending anything, or try a small part of a large file first:
+
+```sh
+flowname input.js --dry-run              # planned API calls and prompt bytes; no key needed
+flowname input.js --sample-requests 3    # send only the first 3 planned requests
+flowname - -o - < input.js > output.js   # standard input to standard output
+```
+
 The CLI writes recovered code to a new `flowname-output-TIMESTAMP-ID/output.js` directory. Add `--report` to watch each request and proposed name in a live HTML report. No flags are required for the default Gemini model. Requires Node.js 22.8+.
 
 For the browser, open the [playground](https://123wwwa.github.io/FlowName/), paste JavaScript, supply your own API key and start recovery. Requests go directly from your browser to the selected provider; **Stop** interrupts the run.

@@ -510,3 +510,49 @@ test('CLI prefers flags, then the environment, then .env, warning when sources d
  assert.deepEqual(seen[2],['Bearer env-key','env-model']);assert.doesNotMatch(third.stderr,/Warning/);
  }finally{await new Promise(r=>server.close(r));}
 });
+
+test('CLI reads stdin, writes a file or stdout, previews the plan, samples and reports early failures',async()=>{
+ const {execFile}=await import('node:child_process');const {promisify}=await import('node:util');const {resolve}=await import('node:path');const {writeFile,readdir}=await import('node:fs/promises');
+ const root=await mkdtemp(join(tmpdir(),'flowname-io-'));
+ const small='const a=1;console.log(a);',large=Array.from({length:40},(_,i)=>`function f${i}(a){return a+${i};}`).join('');
+ await writeFile(join(root,'input.js'),small);await writeFile(join(root,'large.js'),large);
+ const env={...process.env};for(const name of ['GEMINI_API_KEY','GOOGLE_API_KEY','FLOWNAME_API_KEY','FLOWNAME_BASE_URL','FLOWNAME_MODEL'])delete env[name];
+ const run=(args,stdin)=>{const child=promisify(execFile)(process.execPath,[resolve('dist/product-cli.js'),...args],{cwd:root,env});child.child.stdin.end(stdin??'');return child;};
+ const mock=['--provider','mock','--rpm','6000'];
+
+ // Standard input to standard output: only code on stdout, status on stderr, no files.
+ const piped=await run(['-','-o','-','-q',...mock],small);
+ assert.match(piped.stdout,/^const recovered_s6 = 1;\s*console\.log\(recovered_s6\);\s*$/);
+ assert.match(piped.stderr,/completed: 1 calls, 1 renames/);assert.doesNotMatch(piped.stderr,/Progress:|actual tokens/);
+ assert.deepEqual((await readdir(root)).sort(),['input.js','large.js']);
+
+ // A named file is created once and never overwritten.
+ const filed=await run(['input.js','-o','out/recovered.js','-v',...mock]);
+ assert.match(await readFile(join(root,'out/recovered.js'),'utf8'),/recovered_s6/);
+ assert.match(filed.stdout,/Output: .*recovered\.js/);assert.doesNotMatch(filed.stdout,/Output directory/);
+ assert.match(filed.stderr,/Provider: mock/);assert.match(filed.stderr,/ a -> recovered_s6/);
+ await assert.rejects(run(['input.js','-o','out/recovered.js',...mock]),e=>/Output file already exists/.test(e.stderr));
+ assert.match(await readFile(join(root,'out/recovered.js'),'utf8'),/recovered_s6/);
+ // A failed run does not leave an empty reserved file behind.
+ await assert.rejects(run(['large.js','-o','out/unused.js','--max-calls','1',...mock]),e=>/Plan requires \d+ calls/.test(e.stderr));
+ assert.deepEqual(await readdir(join(root,'out')),['recovered.js']);
+
+ // The plan preview needs no key and writes nothing.
+ const preview=await run(['large.js','--dry-run']);
+ assert.match(preview.stdout,/Dry run: no requests sent\.\s+Identifiers to name: 80\s+Planned API calls: (\d+)\s+Prompt bytes: \d+ total, \d+ largest/);
+ const planned=Number(/Planned API calls: (\d+)/.exec(preview.stdout)[1]);assert.ok(planned>1);
+ assert.match((await run(['large.js','--dry-run','--max-calls','1'])).stdout,/exceeds --max-calls 1/);
+ assert.deepEqual((await readdir(root)).sort(),['input.js','large.js','out']);
+
+ // A sample is partial by design and still exits successfully.
+ const sampled=await run(['large.js','-o','-','-q','--sample-requests','1',...mock]);
+ assert.match(sampled.stderr,new RegExp(`Warning: Sample run: sending the first 1 of ${planned} planned requests\\.`));
+ assert.match(sampled.stderr,/partial: 1 calls/);assert.match(sampled.stdout,/recovered_s/);
+
+ // A run that fails before its first request closes the live report.
+ await assert.rejects(run(['large.js','--out','early','--report','--max-calls','1',...mock]),e=>/Plan requires/.test(e.stderr));
+ const html=await readFile(join(root,'early/index.html'),'utf8');assert.match(html,/Run failed: Plan requires/);assert.doesNotMatch(html,/location\.reload/);
+
+ assert.equal((await run(['--version'])).stdout.trim(),JSON.parse(await readFile('package.json','utf8')).version);
+ assert.match((await run(['--help'])).stdout,/--dry-run[\s\S]*--sample-requests/);
+});

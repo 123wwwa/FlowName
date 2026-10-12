@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- Apply names with one edit pass over each binding's own nodes instead of one scope traversal per binding. On a synthetic source with 5,001 bindings (1,001 at the top level) the rename step fell from about 112 seconds to under one second; output matched the previous implementation on 564 comparisons over 141 files. Collision checks are indexed by name.
+- Keep the first 100,000 relations of a very large file and add a warning, instead of failing the analysis.
+- Rewrite the live HTML report at most about once per second and less often as it grows; `events.jsonl` still records every event. `reporter.fail(error)` marks a run that ended before producing a result, and the CLI calls it.
+- Add `planRecovery` and the CLI `--dry-run` for an API-free preview of planned calls and prompt bytes, and `sampleRequests` / `--sample-requests N` for a trial run.
+- Repeat a rate-limited request once when the provider sends a `Retry-After` of at most 60 seconds. Other HTTP 429 responses still end the run.
+- CLI: read standard input with `-`, write code to a new file or standard output with `-o`, `-q`, `-v`, `-V`, print result warnings, and end the progress line before the summary.
+- Remove the unused research CFG analyzer and request builders from the published sources.
+- Run tests before `npm publish` and on Windows in CI.
+
 ## 1.0.2
 
 - Add CLI API key flags (`--api-key` / `-k`) and the `-m` model alias.

@@ -28,6 +28,20 @@ jobs:
       - run: npm ci
       - run: npm run test:package
 
+  # The CLI and report writer have Windows-specific paths (file locks, .cmd shims).
+  # This job reports failures but does not gate the playground deployment.
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run test:pages
+
   build:
     runs-on: ubuntu-latest
     steps:

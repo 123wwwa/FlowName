@@ -23,7 +23,7 @@ const result = await recoverNames(sourceCode, {
 console.log(result.status, result.code);
 ```
 
-The reporter requires a new directory with an existing parent. Open its `index.html` while recovery runs; it refreshes every two seconds. Reports contain source code, requests, responses and recovered output. The CLI's `--report` flag creates the same live report without a library integration.
+The reporter requires a new directory with an existing parent. Open its `index.html` while recovery runs. The page is rewritten at most about once per second, less often as it grows, while `events.jsonl` records every event immediately. Call `reporter.fail(error)` if the run throws, so the page stops refreshing and shows the reason. Reports contain source code, requests, responses and recovered output. The CLI's `--report` flag creates the same live report without a library integration.
 
 ## Choosing prompt and recovery modes
 
@@ -38,7 +38,8 @@ Prompt format defaults to **Compact**, preserving target IDs, source excerpts an
 - Custom providers implement `{ label, async infer(request) }`; see exported TypeScript types. Never embed a shared API key in browser bundles. The static playground accepts each visitor's own key for that session.
 - `onEvent` receives plan/request/response/pass-complete/complete events. Request contexts and parsed responses are observable. Observer failure rejects the run and stops new work; in-flight work drains.
 - AbortSignal/Ctrl+C stops scheduling and drains in-flight requests (provider timeout still applies). Model-content JSON/schema failures allow one corrective retry per group, subject to call and prompt budgets; other errors are not automatically retried.
-- Authentication/quota failures or three consecutive errors stop new work. Partial runs return `status: 'partial'`; missing names stay unchanged. Plan exceeding maxCalls fails before network requests.
+- Authentication/quota failures or three consecutive errors stop new work. A rate-limit response with a `Retry-After` of at most 60 seconds is the exception: pacing pauses and that request is repeated once. Partial runs return `status: 'partial'`; missing names stay unchanged. Plan exceeding maxCalls fails before network requests.
+- `planRecovery(source, options)` returns the identifier count, planned calls and prompt bytes without a provider. `sampleRequests: N` sends only the first N planned requests for a trial run; its result is always partial.
 - UTF-8 prompt byte budgets are a local proxy, not a tokenizer. Budgeted mode sends declaration excerpts and limited relation facts; omission counts are observable. Output has an explicit token cap. Long-source analysis has size/edge/cooperative-time limits, not a hard parser deadline.
 - `rpm` controls request starts, not tokens per minute or dollar spending. Unknown token usage remains null.
 
@@ -120,7 +121,15 @@ CLI: `flowname input.js --out ./new-report --passes 2`. Library: `recoverNames(s
 
 The CLI always shows completed responses, in-flight calls, response errors, retries and observed input/output tokens in the terminal. Missing usage is marked as unavailable rather than counted as zero. TTY output updates in place; redirected output uses progress lines on stderr.
 
-Run `flowname input.js` with your API key in `GEMINI_API_KEY` or `FLOWNAME_API_KEY`, set in the environment or in a `.env` file in the current directory; no flags are required. It creates a unique `flowname-output-TIMESTAMP-ID` directory relative to the current working directory and prints the absolute path. Repeated runs create separate directories and do not overwrite the input. Use `--out ./new-output` to choose a new directory explicitly. By default, only `output.js` and `result.json` are saved. Add `--report` to also write `events.jsonl` and a live `index.html`. The CLI prints a `file:///` URL you can open in your browser; no HTTP server or automatic browser launch is needed. The report refreshes every two seconds during recovery and remains available afterward. An explicit output directory must be new in both modes.
+Run `flowname input.js` with your API key in `GEMINI_API_KEY` or `FLOWNAME_API_KEY`, set in the environment or in a `.env` file in the current directory; no flags are required. It creates a unique `flowname-output-TIMESTAMP-ID` directory relative to the current working directory and prints the absolute path. Repeated runs create separate directories and do not overwrite the input. Use `--out ./new-output` to choose a new directory explicitly. By default, only `output.js` and `result.json` are saved. Add `--report` to also write `events.jsonl` and a live `index.html`. The CLI prints a `file:///` URL you can open in your browser; no HTTP server or automatic browser launch is needed. The report refreshes every few seconds during recovery and remains available afterward. An explicit output directory must be new in both modes.
+
+Other input and output forms:
+
+- `flowname - < input.js` reads standard input.
+- `-o FILE` writes only the recovered code to a new file, and `-o -` writes it to standard output with all status lines on stderr. No output directory is created unless `--out` or `--report` is also given. An existing file is never overwritten.
+- `--dry-run` prints the planned API calls and prompt bytes and exits. It needs no API key and sends nothing.
+- `--sample-requests N` sends only the first N planned requests, for a trial on a large file. The result is partial by design and the exit code is 0 unless a request failed.
+- `-q` hides progress lines; `-v` prints the resolved configuration (never the key) and each applied rename to stderr; `-V` prints the version.
 
 | Option | Default |
 | --- | --- |
